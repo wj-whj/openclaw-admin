@@ -55,7 +55,7 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
               fontWeight: 600,
               color: 'var(--text-primary)'
             }}>
-              OpenClaw
+              剑控系统
             </div>
           </div>
         </div>
