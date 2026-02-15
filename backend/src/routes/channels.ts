@@ -96,7 +96,7 @@ router.post('/', async (req, res) => {
 
     const channelData: Record<string, any> = {};
     for (const key of VALID_FIELDS) {
-      if (rawData[key] !== undefined) {
+      if (rawData[key] !== undefined && rawData[key] !== '') {
         channelData[key] = rawData[key];
       }
     }
@@ -154,7 +154,7 @@ router.put('/:name', async (req, res) => {
 
     const channelData: Record<string, any> = {};
     for (const key of VALID_FIELDS) {
-      if (rawData[key] !== undefined) {
+      if (rawData[key] !== undefined && rawData[key] !== '') {
         channelData[key] = rawData[key];
       }
     }
