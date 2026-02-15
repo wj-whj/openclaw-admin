@@ -179,7 +179,7 @@ async function getUsageInfo() {
   try {
     const sessionsDir = `${os.homedir()}/.openclaw/agents/main/sessions`;
     if (!await fs.pathExists(sessionsDir)) {
-      return { tokensToday: 0, requestsToday: 0 };
+      return { tokensToday: 0, requestsToday: 0, modelStats: [] };
     }
 
     const files = await fs.readdir(sessionsDir);
@@ -187,6 +187,7 @@ async function getUsageInfo() {
 
     let tokensToday = 0;
     let requestsToday = 0;
+    const modelTokens: Record<string, number> = {};
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -204,17 +205,25 @@ async function getUsageInfo() {
             if (timestamp < todayTimestamp) continue;
 
             if (entry.message?.usage?.totalTokens) {
-              tokensToday += entry.message.usage.totalTokens;
+              const tokens = entry.message.usage.totalTokens;
+              const model = entry.message?.model || 'unknown';
+              tokensToday += tokens;
               requestsToday++;
+              modelTokens[model] = (modelTokens[model] || 0) + tokens;
             }
           } catch {}
         }
       } catch {}
     }
 
-    return { tokensToday, requestsToday };
+    // 转换为数组并排序
+    const modelStats = Object.entries(modelTokens)
+      .map(([model, tokens]) => ({ model, tokens }))
+      .sort((a, b) => b.tokens - a.tokens);
+
+    return { tokensToday, requestsToday, modelStats };
   } catch {
-    return { tokensToday: 0, requestsToday: 0 };
+    return { tokensToday: 0, requestsToday: 0, modelStats: [] };
   }
 }
 

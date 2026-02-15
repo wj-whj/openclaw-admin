@@ -6,7 +6,7 @@ import { socket } from '../services/socket';
 interface DashboardData {
   gateway: { status: string; uptime: string; pid: number | null };
   sessions: { total: number; active: number; subagents: number };
-  usage: { tokensToday: number; requestsToday: number };
+  usage: { tokensToday: number; requestsToday: number; modelStats?: { model: string; tokens: number }[] };
   channels: { name: string; enabled: boolean; state: string; detail: string }[];
   system: { cpu: number; memory: number; cpuHistory?: number[]; memoryHistory?: number[] };
 }
@@ -296,6 +296,56 @@ export default function MonitorPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          </Col>
+        </Row>
+      )}
+
+      {/* Model Token Usage Chart */}
+      {dashboard.usage.modelStats && dashboard.usage.modelStats.length > 0 && (
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+          <Col span={24}>
+            <div className="figma-panel">
+              <div className="figma-panel-header">
+                <div className="figma-panel-title">模型 Token 使用统计（今日）</div>
+              </div>
+              <div className="figma-panel-body">
+                <div style={{ padding: 'var(--space-3)' }}>
+                  {dashboard.usage.modelStats.map((stat, idx) => {
+                    const maxTokens = Math.max(...dashboard.usage.modelStats!.map(s => s.tokens));
+                    const percentage = (stat.tokens / maxTokens) * 100;
+                    const displayTokens = stat.tokens > 1000000
+                      ? (stat.tokens / 1000000).toFixed(2) + 'M'
+                      : stat.tokens > 1000
+                        ? (stat.tokens / 1000).toFixed(1) + 'K'
+                        : stat.tokens;
+                    
+                    return (
+                      <div key={idx} style={{ marginBottom: 'var(--space-3)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <span style={{ fontSize: 12, color: '#ccc', fontFamily: 'monospace' }}>{stat.model}</span>
+                          <span style={{ fontSize: 12, color: 'var(--figma-blue)', fontWeight: 600 }}>{displayTokens}</span>
+                        </div>
+                        <div style={{
+                          height: 8,
+                          background: 'var(--bg-tertiary)',
+                          borderRadius: 4,
+                          overflow: 'hidden',
+                          position: 'relative'
+                        }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${percentage}%`,
+                            background: 'linear-gradient(90deg, var(--figma-blue) 0%, rgba(24, 160, 251, 0.6) 100%)',
+                            transition: 'width 0.3s ease',
+                            borderRadius: 4
+                          }} />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
