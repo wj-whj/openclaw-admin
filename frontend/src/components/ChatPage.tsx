@@ -1,7 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { PaperClipOutlined, SendOutlined, DeleteOutlined, FileOutlined, DownloadOutlined, PictureOutlined } from '@ant-design/icons';
 
-const API_BASE = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:7749`;
+// 动态 API 地址，和 api.ts 保持一致
+const getApiBase = () => {
+  const hostname = window.location.hostname;
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    return `http://${hostname}:7749`;
+  }
+  return import.meta.env.VITE_API_URL || 'http://localhost:7749';
+};
+const API_BASE = getApiBase();
 
 interface ChatFile {
   name: string;
