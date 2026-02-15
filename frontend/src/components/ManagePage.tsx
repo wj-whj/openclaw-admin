@@ -606,9 +606,15 @@ export default function ManagePage() {
   return (
     <div className="content-container">
       {/* 会话管理 */}
-      <div className="figma-panel" style={{ marginBottom: 16 }}>
-        <div className="figma-panel-header">
-          <div className="figma-panel-title"><MessageOutlined style={{ marginRight: 6 }} />会话管理</div>
+      <div className="figma-panel" style={{ marginBottom: 24 }}>
+        <div className="figma-panel-header" style={{ 
+          background: 'linear-gradient(135deg, rgba(240, 160, 32, 0.12) 0%, rgba(240, 160, 32, 0.04) 100%)',
+          borderBottom: '1px solid rgba(240, 160, 32, 0.2)'
+        }}>
+          <div className="figma-panel-title">
+            <MessageOutlined style={{ marginRight: 8, color: '#f0a020' }} />
+            会话管理
+          </div>
           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
             <span className="figma-badge figma-badge-blue">{sessions.length} 个</span>
             <span className="figma-badge figma-badge-green">{sessions.filter(s => s.active).length} 活跃</span>
@@ -783,9 +789,15 @@ export default function ManagePage() {
       </div>
 
       {/* Providers 配置 */}
-      <div className="figma-panel" style={{ marginBottom: 16 }}>
-        <div className="figma-panel-header">
-          <div className="figma-panel-title">Providers 配置</div>
+      <div className="figma-panel" style={{ marginBottom: 24 }}>
+        <div className="figma-panel-header" style={{ 
+          background: 'linear-gradient(135deg, rgba(167, 139, 250, 0.12) 0%, rgba(167, 139, 250, 0.04) 100%)',
+          borderBottom: '1px solid rgba(167, 139, 250, 0.2)'
+        }}>
+          <div className="figma-panel-title">
+            <ApiOutlined style={{ marginRight: 8, color: '#a78bfa' }} />
+            Providers 配置
+          </div>
           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
             <span className="figma-badge figma-badge-blue">{providers.length} 个</span>
             <button onClick={() => setShowAddProvider(!showAddProvider)} style={{
@@ -1015,9 +1027,15 @@ export default function ManagePage() {
       </div>
 
       {/* 任务管理 */}
-      <div className="figma-panel">
-        <div className="figma-panel-header">
-          <div className="figma-panel-title"><ClockCircleOutlined style={{ marginRight: 6 }} />定时任务</div>
+      <div className="figma-panel" style={{ marginBottom: 24 }}>
+        <div className="figma-panel-header" style={{ 
+          background: 'linear-gradient(135deg, rgba(78, 143, 240, 0.12) 0%, rgba(78, 143, 240, 0.04) 100%)',
+          borderBottom: '1px solid rgba(78, 143, 240, 0.2)'
+        }}>
+          <div className="figma-panel-title">
+            <ClockCircleOutlined style={{ marginRight: 8, color: '#4e8ff0' }} />
+            定时任务
+          </div>
               <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                 <span className="figma-badge figma-badge-blue">{cronJobs.length} 个</span>
                 <button onClick={() => setShowAddCron(!showAddCron)} style={{
@@ -1260,10 +1278,13 @@ export default function ManagePage() {
           </div>
 
       {/* Channel 配置 */}
-      <div className="figma-panel">
-        <div className="figma-panel-header">
+      <div className="figma-panel" style={{ marginBottom: 24 }}>
+        <div className="figma-panel-header" style={{ 
+          background: 'linear-gradient(135deg, rgba(27, 196, 125, 0.12) 0%, rgba(27, 196, 125, 0.04) 100%)',
+          borderBottom: '1px solid rgba(27, 196, 125, 0.2)'
+        }}>
           <div className="figma-panel-title">
-            <ApiOutlined style={{ marginRight: 6 }} />
+            <ApiOutlined style={{ marginRight: 8, color: '#1bc47d' }} />
             Channel 配置
           </div>
           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
