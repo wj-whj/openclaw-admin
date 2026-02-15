@@ -5,6 +5,7 @@ import Login from './components/Login';
 import Sidebar from './components/Sidebar';
 import MonitorPage from './components/MonitorPage';
 import ManagePage from './components/ManagePage';
+import ChatPage from './components/ChatPage';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -34,6 +35,8 @@ function App() {
         return <MonitorPage />;
       case 'manage':
         return <ManagePage />;
+      case 'chat':
+        return <ChatPage />;
       default:
         return <MonitorPage />;
     }
@@ -41,7 +44,8 @@ function App() {
 
   const pageTitle = {
     monitor: '监控中心',
-    manage: '管理中心'
+    manage: '管理中心',
+    chat: '对话中心'
   }[currentPage];
 
   if (loading) {

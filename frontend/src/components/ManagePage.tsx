@@ -906,7 +906,10 @@ export default function ManagePage() {
                         </span>
                       </div>
                       <div style={{ fontSize: 11, color: '#999', marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {provider.baseUrl}
+                        {provider.baseUrl ? provider.baseUrl.replace(/^(https?:\/\/[^/]+)(.*)$/, (_, host, path) => {
+                          const h = host.replace(/^https?:\/\//, '');
+                          return h.length > 12 ? h.substring(0, 6) + '••••' + h.slice(-4) + (path ? '/••••' : '') : h + (path ? '/••••' : '');
+                        }) : '未配置'}
                       </div>
                       <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
                         <div style={{ fontSize: 11, color: '#ccc', marginBottom: 4 }}>模型 ({provider.models.length})</div>

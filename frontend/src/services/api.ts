@@ -72,3 +72,6 @@ export const testChannel = (name: string) => api.post(`/channels/${name}/test`);
 export const startWhatsAppAuth = () => api.post('/whatsapp/auth/start');
 export const getWhatsAppAuthStatus = () => api.get('/whatsapp/auth/status');
 export const cancelWhatsAppAuth = () => api.post('/whatsapp/auth/cancel');
+
+// Chat
+export const sendChatMessage = (message: string) => api.post('/chat', { message });

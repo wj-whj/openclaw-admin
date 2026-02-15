@@ -1,6 +1,7 @@
 import {
   DashboardOutlined,
   SettingOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 
 interface SidebarProps {
@@ -19,6 +20,11 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
       key: 'manage',
       icon: <SettingOutlined />,
       label: '管理中心',
+    },
+    {
+      key: 'chat',
+      icon: <MessageOutlined />,
+      label: '对话中心',
     },
   ];
 
