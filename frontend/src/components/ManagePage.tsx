@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button, Input, Switch, Row, Col, message } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, SaveOutlined, ClockCircleOutlined, MessageOutlined, EyeOutlined, SearchOutlined, LeftOutlined, ApiOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import { getProviders, createProvider, updateProvider, deleteProvider, setDefaultModel, getTasks, createCronJob, updateCronJob, deleteCronJob, getSessions, getSessionMessages, deleteSession, getChannels, createChannel, updateChannel, deleteChannel, testChannel, openWhatsAppQR, getWhatsAppStatus } from '../services/api';
+import { getProviders, createProvider, updateProvider, deleteProvider, setDefaultModel, getTasks, createCronJob, updateCronJob, deleteCronJob, getSessions, getSessionMessages, deleteSession, getChannels, createChannel, updateChannel, deleteChannel, testChannel, startWhatsAppAuth, getWhatsAppAuthStatus, cancelWhatsAppAuth } from '../services/api';
 
 interface ProviderModel {
   id: string;
@@ -130,6 +130,11 @@ export default function ManagePage() {
     botToken: ''
   });
   const [testingChannel, setTestingChannel] = useState<string | null>(null);
+  
+  // WhatsApp QR 状态
+  const [showWhatsAppQR, setShowWhatsAppQR] = useState(false);
+  const [whatsappQRCode, setWhatsappQRCode] = useState<string | null>(null);
+  const [whatsappAuthStatus, setWhatsappAuthStatus] = useState<string>('idle');
 
   useEffect(() => {
     loadAll();
@@ -355,6 +360,57 @@ export default function ManagePage() {
 
   const getChannelTypeInfo = (type: string) => {
     return CHANNEL_TYPES.find(t => t.value === type) || { value: type, label: type, icon: '📡', color: '#999' };
+  };
+
+  // WhatsApp 认证处理
+  const handleStartWhatsAppAuth = async () => {
+    try {
+      setShowWhatsAppQR(true);
+      setWhatsappAuthStatus('waiting');
+      setWhatsappQRCode(null);
+      
+      const res = await startWhatsAppAuth();
+      setWhatsappQRCode(res.data.qrCode);
+      setWhatsappAuthStatus(res.data.status);
+      
+      // 开始轮询状态
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await getWhatsAppAuthStatus();
+          setWhatsappQRCode(statusRes.data.qrCode);
+          setWhatsappAuthStatus(statusRes.data.status);
+          
+          if (statusRes.data.status === 'success') {
+            clearInterval(pollInterval);
+            message.success('WhatsApp 认证成功！');
+            setShowWhatsAppQR(false);
+          } else if (statusRes.data.status === 'timeout' || statusRes.data.status === 'failed') {
+            clearInterval(pollInterval);
+            message.error(statusRes.data.message);
+          }
+        } catch (error) {
+          clearInterval(pollInterval);
+        }
+      }, 2000);
+      
+      // 60秒后停止轮询
+      setTimeout(() => clearInterval(pollInterval), 60000);
+      
+    } catch (error) {
+      message.error('启动认证失败');
+      setShowWhatsAppQR(false);
+    }
+  };
+
+  const handleCancelWhatsAppAuth = async () => {
+    try {
+      await cancelWhatsAppAuth();
+      setShowWhatsAppQR(false);
+      setWhatsappQRCode(null);
+      setWhatsappAuthStatus('idle');
+    } catch (error) {
+      message.error('取消失败');
+    }
   };
 
   const handleViewSession = async (session: SessionInfo) => {
@@ -1020,14 +1076,7 @@ export default function ManagePage() {
                   <Col span={12}>
                     <div style={{ fontSize: 11, color: '#ccc', marginBottom: 4 }}>配置方式</div>
                     <button
-                      onClick={async () => {
-                        try {
-                          await openWhatsAppQR();
-                          message.success('已打开扫码窗口，请在新窗口中扫描二维码');
-                        } catch {
-                          message.error('打开失败');
-                        }
-                      }}
+                      onClick={handleStartWhatsAppAuth}
                       style={{
                         width: '100%',
                         background: 'var(--figma-green)',
@@ -1043,7 +1092,7 @@ export default function ManagePage() {
                         gap: 6
                       }}
                     >
-                      📱 打开扫码窗口
+                      📱 生成扫码二维码
                     </button>
                     <div style={{ fontSize: 10, color: '#999', marginTop: 6, textAlign: 'center' }}>
                       使用 wacli 扫码连接（无需 Token）
@@ -1369,6 +1418,84 @@ export default function ManagePage() {
           )}
         </div>
       </div>
+
+      {/* WhatsApp 二维码弹窗 */}
+      {showWhatsAppQR && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: 'var(--bg-secondary)',
+            borderRadius: 'var(--radius-md)',
+            padding: 'var(--space-4)',
+            maxWidth: 600,
+            width: '90%',
+            border: '1px solid var(--border-subtle)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ margin: 0, color: '#fff', fontSize: 16 }}>📱 WhatsApp 扫码连接</h3>
+              <button onClick={handleCancelWhatsAppAuth} style={{
+                background: 'none',
+                border: 'none',
+                color: '#999',
+                cursor: 'pointer',
+                fontSize: 20
+              }}>×</button>
+            </div>
+
+            {whatsappAuthStatus === 'waiting' && !whatsappQRCode && (
+              <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+                正在生成二维码...
+              </div>
+            )}
+
+            {whatsappQRCode && (
+              <div style={{
+                background: '#fff',
+                padding: 20,
+                borderRadius: 8,
+                marginBottom: 16
+              }}>
+                <pre style={{
+                  fontFamily: 'monospace',
+                  fontSize: 6,
+                  lineHeight: '6px',
+                  margin: 0,
+                  color: '#000',
+                  overflow: 'auto',
+                  maxHeight: 400
+                }}>
+                  {whatsappQRCode}
+                </pre>
+              </div>
+            )}
+
+            <div style={{ textAlign: 'center', color: '#ccc', fontSize: 13 }}>
+              {whatsappAuthStatus === 'waiting' && '请用手机 WhatsApp 扫描上方二维码'}
+              {whatsappAuthStatus === 'success' && '✓ 认证成功！'}
+              {whatsappAuthStatus === 'timeout' && '⏱ 二维码已超时，请重新生成'}
+              {whatsappAuthStatus === 'failed' && '✗ 认证失败，请重试'}
+            </div>
+
+            {whatsappAuthStatus === 'waiting' && (
+              <div style={{ marginTop: 16, fontSize: 11, color: '#666', textAlign: 'center' }}>
+                1. 打开手机 WhatsApp<br/>
+                2. 进入"设置" → "关联设备"<br/>
+                3. 扫描上方二维码
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

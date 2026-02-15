@@ -69,6 +69,6 @@ export const deleteChannel = (name: string) => api.delete(`/channels/${name}`);
 export const testChannel = (name: string) => api.post(`/channels/${name}/test`);
 
 // WhatsApp
-export const openWhatsAppQR = () => api.post('/whatsapp/auth/open-qr');
-export const getWhatsAppStatus = () => api.get('/whatsapp/auth/status');
-export const getWhatsAppChats = () => api.get('/whatsapp/chats');
+export const startWhatsAppAuth = () => api.post('/whatsapp/auth/start');
+export const getWhatsAppAuthStatus = () => api.get('/whatsapp/auth/status');
+export const cancelWhatsAppAuth = () => api.post('/whatsapp/auth/cancel');
