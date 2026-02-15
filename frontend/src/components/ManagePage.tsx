@@ -112,6 +112,8 @@ export default function ManagePage() {
   const [newProvider, setNewProvider] = useState({ name: '', api: 'openai-completions', baseUrl: '', apiKey: '' });
   const [showAddCron, setShowAddCron] = useState(false);
   const [newCron, setNewCron] = useState({ name: '', scheduleType: 'every', intervalMinutes: '30', dailyTime: '09:00', weekDay: '1', weekTime: '09:00', message: '', sessionTarget: 'isolated' });
+  const [editingCronId, setEditingCronId] = useState<string | null>(null);
+  const [editCron, setEditCron] = useState({ name: '', scheduleType: 'every', intervalMinutes: '30', dailyTime: '09:00', weekDay: '1', weekTime: '09:00', message: '', sessionTarget: 'isolated' });
   const [loading, setLoading] = useState(true);
   const [editingModelIndex, setEditingModelIndex] = useState<number | null>(null);
   
@@ -284,6 +286,64 @@ export default function ManagePage() {
       message.success('已删除');
       loadAll();
     } catch { message.error('删除失败'); }
+  };
+
+  const handleStartEditCron = (job: CronJob) => {
+    const s = job.schedule;
+    let scheduleType = 'every', intervalMinutes = '30', dailyTime = '09:00', weekDay = '1', weekTime = '09:00';
+    if (s?.kind === 'every' && s.everyMs) {
+      scheduleType = 'every';
+      intervalMinutes = String(s.everyMs / 60000);
+    } else if (s?.kind === 'cron' && s.expr) {
+      const parts = s.expr.split(' ');
+      if (parts.length >= 5) {
+        const time = `${parts[1].padStart(2, '0')}:${parts[0].padStart(2, '0')}`;
+        if (parts[4] !== '*') {
+          scheduleType = 'weekly';
+          weekDay = parts[4];
+          weekTime = time;
+        } else {
+          scheduleType = 'daily';
+          dailyTime = time;
+        }
+      }
+    }
+    setEditCron({
+      name: job.name || '',
+      scheduleType, intervalMinutes, dailyTime, weekDay, weekTime,
+      message: job.payload?.message || job.payload?.text || '',
+      sessionTarget: job.sessionTarget || 'isolated'
+    });
+    setEditingCronId(job.id);
+  };
+
+  const handleSaveEditCron = async () => {
+    if (!editingCronId || !editCron.name || !editCron.message) {
+      message.warning('任务名称和描述必填');
+      return;
+    }
+    // 先删除旧任务，再创建新任务（openclaw cron edit 功能有限）
+    try {
+      await deleteCronJob(editingCronId);
+      let scheduleValue: any = {};
+      if (editCron.scheduleType === 'every') {
+        scheduleValue = { minutes: parseInt(editCron.intervalMinutes) };
+      } else if (editCron.scheduleType === 'daily') {
+        scheduleValue = { time: editCron.dailyTime };
+      } else if (editCron.scheduleType === 'weekly') {
+        scheduleValue = { time: editCron.weekTime, day: editCron.weekDay };
+      }
+      await createCronJob({
+        name: editCron.name,
+        scheduleType: editCron.scheduleType,
+        scheduleValue,
+        message: editCron.message,
+        sessionTarget: editCron.sessionTarget
+      });
+      message.success('任务已更新');
+      setEditingCronId(null);
+      loadAll();
+    } catch { message.error('更新失败'); }
   };
 
   // Channel 处理函数
@@ -1052,48 +1112,110 @@ export default function ManagePage() {
                 </div>
               ) : cronJobs.map((job) => (
                 <div key={job.id} className="figma-card" style={{ padding: 'var(--space-3)', marginBottom: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Switch size="small" checked={job.enabled} onChange={() => handleToggleCron(job)} />
-                      <span style={{ fontSize: 13, fontWeight: 600, color: job.enabled ? '#fff' : '#666' }}>{job.name}</span>
+                  {editingCronId === job.id ? (
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 8 }}>编辑任务</div>
+                      <div style={{ marginBottom: 6 }}>
+                        <div style={{ fontSize: 11, color: '#ccc', marginBottom: 2 }}>任务名称</div>
+                        <Input size="small" value={editCron.name} onChange={e => setEditCron({ ...editCron, name: e.target.value })}
+                          style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff' }} />
+                      </div>
+                      <div style={{ marginBottom: 6 }}>
+                        <div style={{ fontSize: 11, color: '#ccc', marginBottom: 2 }}>执行频率</div>
+                        <select value={editCron.scheduleType} onChange={e => setEditCron({ ...editCron, scheduleType: e.target.value })}
+                          style={{ width: '100%', padding: '4px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 12, marginBottom: 6 }}>
+                          <option value="every">每隔一段时间</option>
+                          <option value="daily">每天定时</option>
+                          <option value="weekly">每周定时</option>
+                        </select>
+                        {editCron.scheduleType === 'every' && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 11, color: '#ccc' }}>每隔</span>
+                            <select value={editCron.intervalMinutes} onChange={e => setEditCron({ ...editCron, intervalMinutes: e.target.value })}
+                              style={{ padding: '4px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 12 }}>
+                              <option value="5">5 分钟</option><option value="10">10 分钟</option><option value="15">15 分钟</option>
+                              <option value="30">30 分钟</option><option value="60">1 小时</option><option value="120">2 小时</option>
+                              <option value="360">6 小时</option><option value="720">12 小时</option><option value="1440">24 小时</option>
+                            </select>
+                            <span style={{ fontSize: 11, color: '#ccc' }}>执行一次</span>
+                          </div>
+                        )}
+                        {editCron.scheduleType === 'daily' && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 11, color: '#ccc' }}>每天</span>
+                            <input type="time" value={editCron.dailyTime} onChange={e => setEditCron({ ...editCron, dailyTime: e.target.value })}
+                              style={{ padding: '4px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 12 }} />
+                            <span style={{ fontSize: 11, color: '#ccc' }}>执行</span>
+                          </div>
+                        )}
+                        {editCron.scheduleType === 'weekly' && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 11, color: '#ccc' }}>每周</span>
+                            <select value={editCron.weekDay} onChange={e => setEditCron({ ...editCron, weekDay: e.target.value })}
+                              style={{ padding: '4px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 12 }}>
+                              <option value="1">一</option><option value="2">二</option><option value="3">三</option>
+                              <option value="4">四</option><option value="5">五</option><option value="6">六</option><option value="0">日</option>
+                            </select>
+                            <input type="time" value={editCron.weekTime} onChange={e => setEditCron({ ...editCron, weekTime: e.target.value })}
+                              style={{ padding: '4px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 12 }} />
+                            <span style={{ fontSize: 11, color: '#ccc' }}>执行</span>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ marginBottom: 6 }}>
+                        <div style={{ fontSize: 11, color: '#ccc', marginBottom: 2 }}>任务描述（告诉 AI 做什么）</div>
+                        <Input.TextArea rows={2} value={editCron.message} onChange={e => setEditCron({ ...editCron, message: e.target.value })}
+                          style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff', fontSize: 12 }} />
+                      </div>
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={{ fontSize: 11, color: '#ccc', marginBottom: 2 }}>运行环境</div>
+                        <select value={editCron.sessionTarget} onChange={e => setEditCron({ ...editCron, sessionTarget: e.target.value })}
+                          style={{ width: '100%', padding: '4px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 12 }}>
+                          <option value="isolated">隔离会话 (推荐)</option>
+                          <option value="main">主会话</option>
+                        </select>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                        <button onClick={() => setEditingCronId(null)} style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#ccc', padding: '4px 12px', cursor: 'pointer', fontSize: 12 }}>取消</button>
+                        <button onClick={handleSaveEditCron} style={{ background: 'var(--figma-blue)', border: 'none', borderRadius: 'var(--radius-sm)', color: '#fff', padding: '4px 12px', cursor: 'pointer', fontSize: 12 }}>保存</button>
+                      </div>
                     </div>
-                    <button onClick={() => handleDeleteCron(job.id)} style={{ background: 'none', border: 'none', color: 'var(--figma-red)', cursor: 'pointer', padding: 2 }}>
-                      <DeleteOutlined style={{ fontSize: 12 }} />
-                    </button>
-                  </div>
-                  <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 4 }}>
-                    <span className="figma-badge figma-badge-blue">{(() => {
-                      const s = job.schedule;
-                      if (!s) return '?';
-                      if (s.kind === 'every' && s.everyMs) {
-                        const mins = s.everyMs / 60000;
-                        if (mins < 60) return `每 ${mins} 分钟`;
-                        return `每 ${mins / 60} 小时`;
-                      }
-                      if (s.kind === 'cron' && s.expr) {
-                        const parts = s.expr.split(' ');
-                        if (parts.length >= 5) {
-                          const m = parts[0], h = parts[1], dow = parts[4];
-                          const time = `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
-                          if (dow !== '*') {
-                            const days: Record<string, string> = { '0': '日', '1': '一', '2': '二', '3': '三', '4': '四', '5': '五', '6': '六' };
-                            return `每周${days[dow] || dow} ${time}`;
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Switch size="small" checked={job.enabled} onChange={() => handleToggleCron(job)} />
+                        <span style={{ fontSize: 13, fontWeight: 600, color: job.enabled ? '#fff' : '#666' }}>{job.name}</span>
+                        <span className="figma-badge figma-badge-blue" style={{ fontSize: 10 }}>{(() => {
+                          const s = job.schedule;
+                          if (!s) return '?';
+                          if (s.kind === 'every' && s.everyMs) {
+                            const mins = s.everyMs / 60000;
+                            if (mins < 60) return `每 ${mins} 分钟`;
+                            return `每 ${mins / 60} 小时`;
                           }
-                          return `每天 ${time}`;
-                        }
-                      }
-                      return s.expr || s.kind || '?';
-                    })()}</span>
-                    <span className={`figma-badge figma-badge-${job.sessionTarget === 'main' ? 'yellow' : 'green'}`}>
-                      {job.sessionTarget === 'main' ? '主会话' : '隔离'}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 11, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    📝 {job.payload?.message || job.payload?.text || '(无描述)'}
-                  </div>
-                  {job.lastRun && (
-                    <div style={{ fontSize: 10, color: '#666', marginTop: 4 }}>
-                      上次运行: {new Date(job.lastRun).toLocaleString('zh-CN')} · {job.lastStatus || '?'}
+                          if (s.kind === 'cron' && s.expr) {
+                            const parts = s.expr.split(' ');
+                            if (parts.length >= 5) {
+                              const m = parts[0], h = parts[1], dow = parts[4];
+                              const time = `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
+                              if (dow !== '*') {
+                                const days: Record<string, string> = { '0': '日', '1': '一', '2': '二', '3': '三', '4': '四', '5': '五', '6': '六' };
+                                return `每周${days[dow] || dow} ${time}`;
+                              }
+                              return `每天 ${time}`;
+                            }
+                          }
+                          return s.expr || s.kind || '?';
+                        })()}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => handleStartEditCron(job)} style={{ background: 'none', border: 'none', color: 'var(--figma-blue)', cursor: 'pointer', padding: 2 }}>
+                          <EditOutlined style={{ fontSize: 12 }} />
+                        </button>
+                        <button onClick={() => handleDeleteCron(job.id)} style={{ background: 'none', border: 'none', color: 'var(--figma-red)', cursor: 'pointer', padding: 2 }}>
+                          <DeleteOutlined style={{ fontSize: 12 }} />
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
