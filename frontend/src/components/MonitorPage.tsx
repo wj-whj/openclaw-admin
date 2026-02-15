@@ -274,6 +274,23 @@ export default function MonitorPage() {
             </div>
           </div>
         </Col>
+        <Col span={6}>
+          <div className="figma-panel">
+            <div className="figma-panel-header">
+              <div className="figma-panel-title">内存使用率</div>
+              <span className={`figma-badge figma-badge-${dashboard.system.memory >= 80 ? 'red' : dashboard.system.memory >= 60 ? 'yellow' : 'green'}`}>
+                {dashboard.system.memory >= 80 ? '高占用' : dashboard.system.memory >= 60 ? '较高' : '正常'}
+              </span>
+            </div>
+            <div className="figma-panel-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <CircularProgress value={dashboard.system.memory} size={100} />
+              <div style={{ marginTop: 12, width: '100%' }}>
+                <div style={{ fontSize: 11, color: '#cccccc', marginBottom: 4 }}>趋势</div>
+                <MiniChart data={memHistory} />
+              </div>
+            </div>
+          </div>
+        </Col>
         {dashboard.channels && dashboard.channels.length > 0 && (
           <Col span={12}>
             <div className="figma-panel">
