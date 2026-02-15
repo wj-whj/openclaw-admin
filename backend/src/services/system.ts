@@ -61,25 +61,35 @@ async function getGatewayStatus() {
 
 async function getSessionsInfo() {
   try {
-    const sessionsJsonPath = `${os.homedir()}/.openclaw/agents/main/sessions/sessions.json`;
-    if (!await fs.pathExists(sessionsJsonPath)) {
-      return { total: 0, active: 0, subagents: 0 };
-    }
+    const sessionsDir = `${os.homedir()}/.openclaw/agents/main/sessions`;
+    const sessionsJsonPath = `${sessionsDir}/sessions.json`;
+    const sessionsData = await fs.pathExists(sessionsJsonPath) ? await fs.readJSON(sessionsJsonPath) : {};
+    const knownIds = new Set(Object.values(sessionsData).map((m: any) => m.sessionId));
 
-    const sessionsData = await fs.readJSON(sessionsJsonPath);
-    const entries = Object.entries(sessionsData);
     const now = Date.now();
     const activeThreshold = 30 * 60 * 1000;
-
+    let total = Object.keys(sessionsData).length;
     let activeCount = 0;
     let subagentCount = 0;
 
-    for (const [key, meta] of entries as [string, any][]) {
-      if (key.includes('subagent')) subagentCount++;
+    // sessions.json 中的会话
+    for (const [key, meta] of Object.entries(sessionsData) as [string, any][]) {
       if (meta.updatedAt && (now - meta.updatedAt < activeThreshold)) activeCount++;
     }
 
-    return { total: entries.length, active: activeCount, subagents: subagentCount };
+    // 扫描孤立 jsonl（子代理等）
+    if (await fs.pathExists(sessionsDir)) {
+      const files = await fs.readdir(sessionsDir);
+      for (const file of files) {
+        if (!file.endsWith('.jsonl') || file.includes('.deleted') || file.includes('.lock')) continue;
+        const sid = file.replace('.jsonl', '');
+        if (knownIds.has(sid)) continue;
+        total++;
+        subagentCount++;
+      }
+    }
+
+    return { total, active: activeCount, subagents: subagentCount };
   } catch {
     return { total: 0, active: 0, subagents: 0 };
   }
