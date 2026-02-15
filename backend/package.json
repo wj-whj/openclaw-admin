@@ -9,6 +9,7 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
+    "@types/ws": "^8.18.1",
     "axios": "^1.6.7",
     "cors": "^2.8.5",
     "express": "^4.18.2",
@@ -21,7 +22,8 @@
     "sharp": "^0.34.5",
     "socket.io": "^4.6.1",
     "whatsapp-web.js": "^1.34.6",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
