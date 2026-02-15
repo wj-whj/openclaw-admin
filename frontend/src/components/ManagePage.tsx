@@ -246,23 +246,22 @@ export default function ManagePage() {
       message.warning('任务名称和任务描述必填');
       return;
     }
-    let schedule: any;
+    // 构建后端需要的 scheduleValue
+    let scheduleValue: any = {};
     if (newCron.scheduleType === 'every') {
-      schedule = { kind: 'every', everyMs: parseInt(newCron.intervalMinutes) * 60 * 1000 };
+      scheduleValue = { minutes: parseInt(newCron.intervalMinutes) };
     } else if (newCron.scheduleType === 'daily') {
-      const [h, m] = newCron.dailyTime.split(':');
-      schedule = { kind: 'cron', expr: `${parseInt(m)} ${parseInt(h)} * * *`, tz: 'Asia/Shanghai' };
+      scheduleValue = { time: newCron.dailyTime };
     } else if (newCron.scheduleType === 'weekly') {
-      const [h, m] = newCron.weekTime.split(':');
-      schedule = { kind: 'cron', expr: `${parseInt(m)} ${parseInt(h)} * * ${newCron.weekDay}`, tz: 'Asia/Shanghai' };
+      scheduleValue = { time: newCron.weekTime, day: newCron.weekDay };
     }
     try {
       await createCronJob({
         name: newCron.name,
-        schedule,
-        payload: { kind: 'agentTurn', message: newCron.message },
-        sessionTarget: newCron.sessionTarget,
-        enabled: true
+        scheduleType: newCron.scheduleType,
+        scheduleValue,
+        message: newCron.message,
+        sessionTarget: newCron.sessionTarget
       });
       message.success('定时任务已添加');
       setShowAddCron(false);
