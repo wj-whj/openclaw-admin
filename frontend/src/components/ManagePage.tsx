@@ -111,9 +111,9 @@ export default function ManagePage() {
   const [showAddProvider, setShowAddProvider] = useState(false);
   const [newProvider, setNewProvider] = useState({ name: '', api: 'openai-completions', baseUrl: '', apiKey: '' });
   const [showAddCron, setShowAddCron] = useState(false);
-  const [newCron, setNewCron] = useState({ name: '', scheduleType: 'every', intervalMinutes: '30', dailyTime: '09:00', weekDay: '1', weekTime: '09:00', message: '', sessionTarget: 'isolated' });
+  const [newCron, setNewCron] = useState({ name: '', scheduleType: 'every', intervalMinutes: '30', dailyTime: '09:00', weekDay: '1', weekTime: '09:00', message: '', sessionTarget: 'isolated', deliveryChannel: 'auto' });
   const [editingCronId, setEditingCronId] = useState<string | null>(null);
-  const [editCron, setEditCron] = useState({ name: '', scheduleType: 'every', intervalMinutes: '30', dailyTime: '09:00', weekDay: '1', weekTime: '09:00', message: '', sessionTarget: 'isolated' });
+  const [editCron, setEditCron] = useState({ name: '', scheduleType: 'every', intervalMinutes: '30', dailyTime: '09:00', weekDay: '1', weekTime: '09:00', message: '', sessionTarget: 'isolated', deliveryChannel: 'auto' });
   const [loading, setLoading] = useState(true);
   const [editingModelIndex, setEditingModelIndex] = useState<number | null>(null);
   
@@ -263,11 +263,12 @@ export default function ManagePage() {
         scheduleType: newCron.scheduleType,
         scheduleValue,
         message: newCron.message,
-        sessionTarget: newCron.sessionTarget
+        sessionTarget: newCron.sessionTarget,
+        deliveryChannel: newCron.deliveryChannel
       });
       message.success('定时任务已添加');
       setShowAddCron(false);
-      setNewCron({ name: '', scheduleType: 'every', intervalMinutes: '30', dailyTime: '09:00', weekDay: '1', weekTime: '09:00', message: '', sessionTarget: 'isolated' });
+      setNewCron({ name: '', scheduleType: 'every', intervalMinutes: '30', dailyTime: '09:00', weekDay: '1', weekTime: '09:00', message: '', sessionTarget: 'isolated', deliveryChannel: 'auto' });
       loadAll();
     } catch { message.error('添加失败'); }
   };
@@ -312,7 +313,8 @@ export default function ManagePage() {
       name: job.name || '',
       scheduleType, intervalMinutes, dailyTime, weekDay, weekTime,
       message: job.payload?.message || job.payload?.text || '',
-      sessionTarget: job.sessionTarget || 'isolated'
+      sessionTarget: job.sessionTarget || 'isolated',
+      deliveryChannel: (job as any).delivery?.channel || 'auto'
     });
     setEditingCronId(job.id);
   };
@@ -338,7 +340,8 @@ export default function ManagePage() {
         scheduleType: editCron.scheduleType,
         scheduleValue,
         message: editCron.message,
-        sessionTarget: editCron.sessionTarget
+        sessionTarget: editCron.sessionTarget,
+        deliveryChannel: editCron.deliveryChannel
       });
       message.success('任务已更新');
       setEditingCronId(null);
@@ -1099,6 +1102,19 @@ export default function ManagePage() {
                       <option value="main">主会话</option>
                     </select>
                   </div>
+                  {newCron.sessionTarget === 'isolated' && (
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, color: '#ccc', marginBottom: 2 }}>结果发送到</div>
+                      <select value={newCron.deliveryChannel} onChange={e => setNewCron({ ...newCron, deliveryChannel: e.target.value })}
+                        style={{ width: '100%', padding: '4px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 12 }}>
+                        <option value="auto">自动（最近使用的渠道）</option>
+                        <option value="telegram">Telegram</option>
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="discord">Discord</option>
+                        <option value="webchat">Web Chat</option>
+                      </select>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                     <button onClick={() => setShowAddCron(false)} style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#ccc', padding: '4px 12px', cursor: 'pointer', fontSize: 12 }}>取消</button>
                     <button onClick={handleAddCron} style={{ background: 'var(--figma-blue)', border: 'none', borderRadius: 'var(--radius-sm)', color: '#fff', padding: '4px 12px', cursor: 'pointer', fontSize: 12 }}>创建</button>
@@ -1175,6 +1191,19 @@ export default function ManagePage() {
                           <option value="main">主会话</option>
                         </select>
                       </div>
+                      {editCron.sessionTarget === 'isolated' && (
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{ fontSize: 11, color: '#ccc', marginBottom: 2 }}>结果发送到</div>
+                          <select value={editCron.deliveryChannel} onChange={e => setEditCron({ ...editCron, deliveryChannel: e.target.value })}
+                            style={{ width: '100%', padding: '4px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 12 }}>
+                            <option value="auto">自动（最近使用的渠道）</option>
+                            <option value="telegram">Telegram</option>
+                            <option value="whatsapp">WhatsApp</option>
+                            <option value="discord">Discord</option>
+                            <option value="webchat">Web Chat</option>
+                          </select>
+                        </div>
+                      )}
                       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                         <button onClick={() => setEditingCronId(null)} style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#ccc', padding: '4px 12px', cursor: 'pointer', fontSize: 12 }}>取消</button>
                         <button onClick={handleSaveEditCron} style={{ background: 'var(--figma-blue)', border: 'none', borderRadius: 'var(--radius-sm)', color: '#fff', padding: '4px 12px', cursor: 'pointer', fontSize: 12 }}>保存</button>

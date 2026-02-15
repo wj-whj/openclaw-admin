@@ -76,7 +76,7 @@ router.get('/', async (req, res) => {
 // POST /api/tasks/cron - 创建定时任务（通过 openclaw cron add）
 router.post('/cron', async (req, res) => {
   try {
-    const { name, scheduleType, scheduleValue, message: taskMessage, sessionTarget } = req.body;
+    const { name, scheduleType, scheduleValue, message: taskMessage, sessionTarget, deliveryChannel, deliveryTo } = req.body;
     if (!taskMessage) {
       return res.status(400).json({ error: 'message is required' });
     }
@@ -113,6 +113,12 @@ router.post('/cron', async (req, res) => {
       args.push('--system-event', JSON.stringify(taskMessage));
     } else {
       args.push('--message', JSON.stringify(taskMessage));
+      // 发送渠道
+      args.push('--announce');
+      if (deliveryChannel && deliveryChannel !== 'auto') {
+        args.push('--channel', deliveryChannel);
+        if (deliveryTo) args.push('--to', JSON.stringify(deliveryTo));
+      }
     }
 
     const output = await cronExec(args.join(' '));
