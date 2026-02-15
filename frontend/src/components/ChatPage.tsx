@@ -34,6 +34,7 @@ export default function ChatPage() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [lastSync, setLastSync] = useState(0);
   const [autoScroll, setAutoScroll] = useState(true);
+  const prevMessageCountRef = useRef(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -52,7 +53,13 @@ export default function ChatPage() {
     setAutoScroll(isAtBottom);
   };
 
-  useEffect(() => { scrollToBottom(); }, [messages, loading, autoScroll]);
+  // 只在消息数量变化时自动滚动（新消息到达或发送）
+  useEffect(() => {
+    if (messages.length > prevMessageCountRef.current) {
+      scrollToBottom();
+    }
+    prevMessageCountRef.current = messages.length;
+  }, [messages.length, autoScroll]);
 
   // 定期同步会话历史（每 5 秒）
   useEffect(() => {
