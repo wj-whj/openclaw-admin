@@ -499,7 +499,8 @@ export default function ManagePage() {
     setMsgChannelFilter('');
     try {
       const res = await getSessionMessages(session.sessionId, { limit: 50, offset: 0 });
-      setChatMessages(res.data.messages || []);
+      // 后端返回的是从新到旧，前端反转让最新消息在底部
+      setChatMessages((res.data.messages || []).reverse());
       setChatTotal(res.data.total || 0);
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     } catch {
@@ -515,7 +516,9 @@ export default function ManagePage() {
     setChatLoading(true);
     try {
       const res = await getSessionMessages(viewingSession.sessionId, { limit: 50, offset: newOffset, filter: 'chat', ...(msgChannelFilter ? { channel: msgChannelFilter } : {}) } as any);
-      setChatMessages(prev => [...prev, ...(res.data.messages || [])]);
+      // 后端返回从新到旧，反转后插入到列表开头（更早的消息）
+      const olderMessages = (res.data.messages || []).reverse();
+      setChatMessages(prev => [...olderMessages, ...prev]);
       setChatOffset(newOffset);
     } catch {
       message.error('加载更多失败');
@@ -531,7 +534,7 @@ export default function ManagePage() {
     setChatOffset(0);
     try {
       const res = await getSessionMessages(viewingSession.sessionId, { limit: 50, offset: 0, ...(channel ? { channel } : {}) } as any);
-      setChatMessages(res.data.messages || []);
+      setChatMessages((res.data.messages || []).reverse());
       setChatTotal(res.data.total || 0);
     } catch {
       message.error('加载消息失败');
@@ -725,6 +728,15 @@ export default function ManagePage() {
                       <div style={{ textAlign: 'center', color: '#999', padding: 40, fontSize: 12 }}>暂无消息</div>
                     ) : (
                       <>
+                        {/* 加载更多按钮在顶部 */}
+                        {chatMessages.length < chatTotal && (
+                          <div style={{ textAlign: 'center', padding: 'var(--space-2)' }}>
+                            <button onClick={handleLoadMoreMessages} disabled={chatLoading}
+                              style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--figma-blue)', padding: '4px 16px', cursor: 'pointer', fontSize: 11 }}>
+                              {chatLoading ? '加载中...' : `加载更早消息 (${chatMessages.length}/${chatTotal})`}
+                            </button>
+                          </div>
+                        )}
                         {chatMessages.map((msg, i) => (
                           <div key={msg.id || i} style={{
                             marginBottom: 'var(--space-2)',
@@ -759,14 +771,6 @@ export default function ManagePage() {
                             </div>
                           </div>
                         ))}
-                        {chatMessages.length < chatTotal && (
-                          <div style={{ textAlign: 'center', padding: 'var(--space-2)' }}>
-                            <button onClick={handleLoadMoreMessages} disabled={chatLoading}
-                              style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--figma-blue)', padding: '4px 16px', cursor: 'pointer', fontSize: 11 }}>
-                              {chatLoading ? '加载中...' : `加载更多 (${chatMessages.length}/${chatTotal})`}
-                            </button>
-                          </div>
-                        )}
                         <div ref={chatEndRef} />
                       </>
                     )}

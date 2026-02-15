@@ -251,7 +251,9 @@ router.get('/:sessionId/messages', async (req, res) => {
     }
 
     const total = messages.length;
-    const sliced = messages.slice(offset, offset + limit);
+    // 反转顺序：最新消息在前（前端会再反转显示，最终最新消息在底部）
+    const reversed = messages.reverse();
+    const sliced = reversed.slice(offset, offset + limit);
 
     res.json({ messages: sliced, total, offset, limit });
   } catch (error) {
