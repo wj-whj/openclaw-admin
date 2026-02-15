@@ -212,6 +212,26 @@ router.post('/:name/test', async (req, res) => {
     }
 
     const channel = config.channels[name];
+
+    // WhatsApp 用 wacli 认证，不需要 token
+    if (name === 'whatsapp') {
+      try {
+        const { execSync } = require('child_process');
+        const output = execSync('wacli doctor 2>&1', { encoding: 'utf-8', timeout: 5000 });
+        const authenticated = output.includes('AUTHENTICATED  true');
+        const connected = output.includes('CONNECTED      true');
+        return res.json({
+          ok: true,
+          connected: authenticated,
+          message: authenticated
+            ? (connected ? '已认证且已连接' : '已认证，未连接（需启动 gateway）')
+            : '未认证，请先扫码连接'
+        });
+      } catch {
+        return res.json({ ok: true, connected: false, message: '无法检测 wacli 状态' });
+      }
+    }
+
     const hasCredentials = channel.botToken || channel.token || channel.apiKey;
 
     res.json({
