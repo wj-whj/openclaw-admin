@@ -111,7 +111,7 @@ export default function ManagePage() {
   const [showAddProvider, setShowAddProvider] = useState(false);
   const [newProvider, setNewProvider] = useState({ name: '', api: 'openai-completions', baseUrl: '', apiKey: '' });
   const [showAddCron, setShowAddCron] = useState(false);
-  const [newCron, setNewCron] = useState({ name: '', expr: '', message: '', sessionTarget: 'isolated' });
+  const [newCron, setNewCron] = useState({ name: '', scheduleType: 'every', intervalMinutes: '30', dailyTime: '09:00', weekDay: '1', weekTime: '09:00', message: '', sessionTarget: 'isolated' });
   const [loading, setLoading] = useState(true);
   const [editingModelIndex, setEditingModelIndex] = useState<number | null>(null);
   
@@ -242,21 +242,31 @@ export default function ManagePage() {
   };
 
   const handleAddCron = async () => {
-    if (!newCron.name || !newCron.expr || !newCron.message) {
-      message.warning('请填写完整');
+    if (!newCron.name || !newCron.message) {
+      message.warning('任务名称和任务描述必填');
       return;
+    }
+    let schedule: any;
+    if (newCron.scheduleType === 'every') {
+      schedule = { kind: 'every', everyMs: parseInt(newCron.intervalMinutes) * 60 * 1000 };
+    } else if (newCron.scheduleType === 'daily') {
+      const [h, m] = newCron.dailyTime.split(':');
+      schedule = { kind: 'cron', expr: `${parseInt(m)} ${parseInt(h)} * * *`, tz: 'Asia/Shanghai' };
+    } else if (newCron.scheduleType === 'weekly') {
+      const [h, m] = newCron.weekTime.split(':');
+      schedule = { kind: 'cron', expr: `${parseInt(m)} ${parseInt(h)} * * ${newCron.weekDay}`, tz: 'Asia/Shanghai' };
     }
     try {
       await createCronJob({
         name: newCron.name,
-        schedule: { kind: 'cron', expr: newCron.expr },
+        schedule,
         payload: { kind: 'agentTurn', message: newCron.message },
         sessionTarget: newCron.sessionTarget,
         enabled: true
       });
       message.success('定时任务已添加');
       setShowAddCron(false);
-      setNewCron({ name: '', expr: '', message: '', sessionTarget: 'isolated' });
+      setNewCron({ name: '', scheduleType: 'every', intervalMinutes: '30', dailyTime: '09:00', weekDay: '1', weekTime: '09:00', message: '', sessionTarget: 'isolated' });
       loadAll();
     } catch { message.error('添加失败'); }
   };
@@ -964,14 +974,61 @@ export default function ManagePage() {
                       style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff' }} />
                   </div>
                   <div style={{ marginBottom: 6 }}>
-                    <div style={{ fontSize: 11, color: '#ccc', marginBottom: 2 }}>Cron 表达式</div>
-                    <Input size="small" placeholder="0 9 * * *（每天 9 点）" value={newCron.expr}
-                      onChange={e => setNewCron({ ...newCron, expr: e.target.value })}
-                      style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff' }} />
+                    <div style={{ fontSize: 11, color: '#ccc', marginBottom: 2 }}>执行频率</div>
+                    <select value={newCron.scheduleType} onChange={e => setNewCron({ ...newCron, scheduleType: e.target.value })}
+                      style={{ width: '100%', padding: '4px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 12, marginBottom: 6 }}>
+                      <option value="every">每隔一段时间</option>
+                      <option value="daily">每天定时</option>
+                      <option value="weekly">每周定时</option>
+                    </select>
+                    {newCron.scheduleType === 'every' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 11, color: '#ccc' }}>每隔</span>
+                        <select value={newCron.intervalMinutes} onChange={e => setNewCron({ ...newCron, intervalMinutes: e.target.value })}
+                          style={{ padding: '4px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 12 }}>
+                          <option value="5">5 分钟</option>
+                          <option value="10">10 分钟</option>
+                          <option value="15">15 分钟</option>
+                          <option value="30">30 分钟</option>
+                          <option value="60">1 小时</option>
+                          <option value="120">2 小时</option>
+                          <option value="360">6 小时</option>
+                          <option value="720">12 小时</option>
+                          <option value="1440">24 小时</option>
+                        </select>
+                        <span style={{ fontSize: 11, color: '#ccc' }}>执行一次</span>
+                      </div>
+                    )}
+                    {newCron.scheduleType === 'daily' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 11, color: '#ccc' }}>每天</span>
+                        <input type="time" value={newCron.dailyTime} onChange={e => setNewCron({ ...newCron, dailyTime: e.target.value })}
+                          style={{ padding: '4px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 12 }} />
+                        <span style={{ fontSize: 11, color: '#ccc' }}>执行</span>
+                      </div>
+                    )}
+                    {newCron.scheduleType === 'weekly' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 11, color: '#ccc' }}>每周</span>
+                        <select value={newCron.weekDay} onChange={e => setNewCron({ ...newCron, weekDay: e.target.value })}
+                          style={{ padding: '4px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 12 }}>
+                          <option value="1">一</option>
+                          <option value="2">二</option>
+                          <option value="3">三</option>
+                          <option value="4">四</option>
+                          <option value="5">五</option>
+                          <option value="6">六</option>
+                          <option value="0">日</option>
+                        </select>
+                        <input type="time" value={newCron.weekTime} onChange={e => setNewCron({ ...newCron, weekTime: e.target.value })}
+                          style={{ padding: '4px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 12 }} />
+                        <span style={{ fontSize: 11, color: '#ccc' }}>执行</span>
+                      </div>
+                    )}
                   </div>
                   <div style={{ marginBottom: 6 }}>
-                    <div style={{ fontSize: 11, color: '#ccc', marginBottom: 2 }}>执行指令</div>
-                    <Input.TextArea rows={2} placeholder="检查未读邮件并汇报" value={newCron.message}
+                    <div style={{ fontSize: 11, color: '#ccc', marginBottom: 2 }}>任务描述（告诉 AI 做什么）</div>
+                    <Input.TextArea rows={2} placeholder="检查未读邮件，如果有重要邮件就通知我" value={newCron.message}
                       onChange={e => setNewCron({ ...newCron, message: e.target.value })}
                       style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff', fontSize: 12 }} />
                   </div>
@@ -1006,13 +1063,34 @@ export default function ManagePage() {
                     </button>
                   </div>
                   <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 4 }}>
-                    <span className="figma-badge figma-badge-blue">{job.schedule?.expr || job.schedule?.kind || '?'}</span>
+                    <span className="figma-badge figma-badge-blue">{(() => {
+                      const s = job.schedule;
+                      if (!s) return '?';
+                      if (s.kind === 'every' && s.everyMs) {
+                        const mins = s.everyMs / 60000;
+                        if (mins < 60) return `每 ${mins} 分钟`;
+                        return `每 ${mins / 60} 小时`;
+                      }
+                      if (s.kind === 'cron' && s.expr) {
+                        const parts = s.expr.split(' ');
+                        if (parts.length >= 5) {
+                          const m = parts[0], h = parts[1], dow = parts[4];
+                          const time = `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
+                          if (dow !== '*') {
+                            const days: Record<string, string> = { '0': '日', '1': '一', '2': '二', '3': '三', '4': '四', '5': '五', '6': '六' };
+                            return `每周${days[dow] || dow} ${time}`;
+                          }
+                          return `每天 ${time}`;
+                        }
+                      }
+                      return s.expr || s.kind || '?';
+                    })()}</span>
                     <span className={`figma-badge figma-badge-${job.sessionTarget === 'main' ? 'yellow' : 'green'}`}>
                       {job.sessionTarget === 'main' ? '主会话' : '隔离'}
                     </span>
                   </div>
                   <div style={{ fontSize: 11, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {job.payload?.message || job.payload?.text || '(无指令)'}
+                    📝 {job.payload?.message || job.payload?.text || '(无描述)'}
                   </div>
                   {job.lastRun && (
                     <div style={{ fontSize: 10, color: '#666', marginTop: 4 }}>
