@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button, Input, Switch, Row, Col, message } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, SaveOutlined, ClockCircleOutlined, MessageOutlined, EyeOutlined, SearchOutlined, LeftOutlined } from '@ant-design/icons';
-import { getProviders, createProvider, updateProvider, deleteProvider, setDefaultModel, getTasks, createCronJob, updateCronJob, deleteCronJob, getSessions, getSessionMessages, deleteSession } from '../services/api';
+import { getProviders, createProvider, updateProvider, deleteProvider, setDefaultModel, getTasks, createCronJob, updateCronJob, deleteCronJob, getSessions, getSessionMessages, deleteSession, getChannels, createChannel, updateChannel, deleteChannel, testChannel } from '../services/api';
 
 interface ProviderModel {
   id: string;

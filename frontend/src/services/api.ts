@@ -60,3 +60,10 @@ export const getTasks = () => api.get('/tasks');
 export const createCronJob = (data: any) => api.post('/tasks/cron', data);
 export const updateCronJob = (id: string, data: any) => api.put(`/tasks/cron/${id}`, data);
 export const deleteCronJob = (id: string) => api.delete(`/tasks/cron/${id}`);
+
+// Channels
+export const getChannels = () => api.get('/channels');
+export const createChannel = (data: any) => api.post('/channels', data);
+export const updateChannel = (name: string, data: any) => api.put(`/channels/${name}`, data);
+export const deleteChannel = (name: string) => api.delete(`/channels/${name}`);
+export const testChannel = (name: string) => api.post(`/channels/${name}/test`);
