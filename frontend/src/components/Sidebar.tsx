@@ -51,9 +51,10 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
           </div>
           <div>
             <div style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: 'var(--text-primary)'
+              fontSize: 16,
+              fontWeight: 700,
+              color: 'var(--text-primary)',
+              letterSpacing: '0.5px'
             }}>
               剑控系统
             </div>
