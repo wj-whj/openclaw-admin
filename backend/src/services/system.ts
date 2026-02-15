@@ -26,13 +26,22 @@ export async function getDashboardData(): Promise<DashboardData & { system: { cp
   if (cpuHistory.length > MAX_HISTORY) cpuHistory.shift();
   if (memoryHistory.length > MAX_HISTORY) memoryHistory.shift();
 
+  // 平滑处理：取最近 3 次的平均值（减少瞬时波动）
+  const smoothCpu = cpuHistory.length >= 3
+    ? Math.round(cpuHistory.slice(-3).reduce((a, b) => a + b, 0) / Math.min(3, cpuHistory.length))
+    : systemInfo.cpu;
+  const smoothMemory = memoryHistory.length >= 3
+    ? Math.round(memoryHistory.slice(-3).reduce((a, b) => a + b, 0) / Math.min(3, memoryHistory.length))
+    : systemInfo.memory;
+
   return {
     gateway: gatewayStatus,
     sessions,
     usage,
     channels,
     system: {
-      ...systemInfo,
+      cpu: smoothCpu,
+      memory: smoothMemory,
       cpuHistory: [...cpuHistory],
       memoryHistory: [...memoryHistory]
     }
@@ -142,25 +151,22 @@ async function getUsageInfo() {
 
 async function getSystemInfo() {
   try {
-    // CPU: 用 iostat 获取（与活动监视器一致）
+    // CPU: 用 top -l 2 获取第二次采样（更准确）
     let cpu = 0;
     try {
-      const { stdout: iostatOutput } = await execAsync('/usr/sbin/iostat -c 2 -w 1');
-      const lines = iostatOutput.trim().split('\n');
-      // 取最后一行（第二次采样）
-      const lastLine = lines[lines.length - 1];
-      const parts = lastLine.trim().split(/\s+/);
-      // 格式: ... us sy id ...
-      // 找到 cpu 列后的三个数字
-      const cpuIdx = lines[0].indexOf('cpu');
-      if (cpuIdx > -1 && parts.length >= 3) {
-        // 倒数第4、5、6个是 us sy id（从右往左：load3个 + us sy id）
-        const us = parseFloat(parts[parts.length - 6] || '0');
-        const sy = parseFloat(parts[parts.length - 5] || '0');
-        cpu = Math.round(us + sy);
+      const { stdout: topOutput } = await execAsync('top -l 2 -n 0', { timeout: 3000 });
+      const cpuLines = topOutput.match(/CPU usage:.*?idle/g);
+      if (cpuLines && cpuLines.length >= 2) {
+        // 取第二次采样
+        const secondSample = cpuLines[1];
+        const userMatch = secondSample.match(/([\d.]+)%\s*user/);
+        const sysMatch = secondSample.match(/([\d.]+)%\s*sys/);
+        if (userMatch && sysMatch) {
+          cpu = Math.round(parseFloat(userMatch[1]) + parseFloat(sysMatch[1]));
+        }
       }
     } catch {
-      // fallback to top
+      // fallback to single sample
       const { stdout: topOutput } = await execAsync('top -l 1 -n 0');
       const idleMatch = topOutput.match(/([\d.]+)%\s*idle/);
       cpu = idleMatch ? Math.round(100 - parseFloat(idleMatch[1])) : 0;
