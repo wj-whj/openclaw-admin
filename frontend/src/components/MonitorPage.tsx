@@ -317,14 +317,20 @@ export default function MonitorPage() {
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', paddingLeft: session.active ? 8 : 0 }}>
-                      {session.key.replace('agent:main:', '')}
+                      {session.key.startsWith('orphan:') ? (session.label || session.sessionId.substring(0, 8)) : session.key.replace('agent:main:', '')}
                     </span>
+                    {session.kind && session.kind !== 'main' && (
+                      <span className="figma-badge figma-badge-yellow" style={{ fontSize: 10 }}>{session.kind === 'isolated' ? '子代理' : session.kind}</span>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 4, flexWrap: 'wrap' }}>
                     <span className="figma-badge figma-badge-blue">{session.channel || 'unknown'}</span>
                     <span className={`figma-badge figma-badge-${session.active ? 'green' : 'gray'}`}>
                       {session.active ? '活跃' : '空闲'}
                     </span>
+                    {session.model && (
+                      <span className="figma-badge figma-badge-purple" style={{ fontSize: 10 }}>{session.model}</span>
+                    )}
                   </div>
                   <div style={{ fontSize: 11, color: '#cccccc', display: 'flex', gap: 'var(--space-3)' }}>
                     <span>消息: {session.messageCount}</span>

@@ -22,87 +22,78 @@ function extractChannel(text: string): string | null {
   return label;
 }
 
-// GET /api/sessions — 会话列表
+// GET /api/sessions — 会话列表（包括子代理和孤立会话）
 router.get('/', async (req, res) => {
   try {
     const sessionsJsonPath = path.join(SESSIONS_DIR, 'sessions.json');
-    if (!await fs.pathExists(sessionsJsonPath)) {
-      return res.json({ sessions: [] });
-    }
-
-    const sessionsData = await fs.readJSON(sessionsJsonPath);
+    const sessionsData = await fs.pathExists(sessionsJsonPath) ? await fs.readJSON(sessionsJsonPath) : {};
     const now = Date.now();
     const activeThreshold = 30 * 60 * 1000;
     const sessions = [];
+    const knownSessionIds = new Set<string>();
 
+    // 1. 从 sessions.json 读取已注册的会话
     for (const [key, meta] of Object.entries(sessionsData) as [string, any][]) {
+      knownSessionIds.add(meta.sessionId);
       const sessionFile = path.join(SESSIONS_DIR, `${meta.sessionId}.jsonl`);
-      let messageCount = 0;
-      let tokenCount = 0;
-      let fileSize = 0;
-      let firstMessageAt: string | null = null;
-      let lastMessageAt: string | null = null;
-      const channelsSet = new Set<string>();
+      const info = await parseSessionFile(sessionFile);
 
-      if (await fs.pathExists(sessionFile)) {
-        try {
-          const stat = await fs.stat(sessionFile);
-          fileSize = stat.size;
-          const content = await fs.readFile(sessionFile, 'utf-8');
-          const lines = content.trim().split('\n').filter((l: string) => l.length > 0);
-          for (const line of lines) {
-            try {
-              const entry = JSON.parse(line);
-              if (entry.message?.role === 'user' || entry.message?.role === 'assistant') {
-                messageCount++;
-                const ts = entry.message?.timestamp || entry.timestamp;
-                if (ts) {
-                  if (!firstMessageAt) firstMessageAt = ts;
-                  lastMessageAt = ts;
-                }
-              }
-              if (entry.message?.usage?.totalTokens) {
-                tokenCount += entry.message.usage.totalTokens;
-              }
-              // 提取渠道
-              if (entry.message?.role === 'user') {
-                let text = '';
-                if (typeof entry.message.content === 'string') {
-                  text = entry.message.content;
-                } else if (Array.isArray(entry.message.content)) {
-                  text = entry.message.content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n');
-                }
-                const ch = extractChannel(text);
-                if (ch) channelsSet.add(ch);
-              }
-            } catch {}
-          }
-        } catch {}
-      }
-
-      // fallback: 如果没扫到任何渠道，用 meta 里的
-      if (channelsSet.size === 0) {
+      if (info.channelsSet.size === 0) {
         const fallbackCh = meta.deliveryContext?.channel || meta.origin?.provider || 'unknown';
-        channelsSet.add(fallbackCh);
+        info.channelsSet.add(fallbackCh);
       }
 
       sessions.push({
         key,
         sessionId: meta.sessionId || '',
-        kind: meta.kind || 'main',
+        kind: meta.kind || (key.includes(':main:') ? 'main' : 'isolated'),
         chatType: meta.chatType || 'unknown',
         channel: meta.deliveryContext?.channel || meta.origin?.provider || 'unknown',
-        channels: [...channelsSet],
-        label: meta.label || '',
+        channels: [...info.channelsSet],
+        label: meta.label || meta.origin?.label || '',
         lastTo: meta.lastTo || '',
         updatedAt: meta.updatedAt || 0,
         compactionCount: meta.compactionCount || 0,
         active: meta.updatedAt ? (now - meta.updatedAt < activeThreshold) : false,
-        messageCount,
-        tokenCount,
-        fileSize,
-        firstMessageAt,
-        lastMessageAt
+        messageCount: info.messageCount,
+        tokenCount: info.tokenCount,
+        fileSize: info.fileSize,
+        firstMessageAt: info.firstMessageAt,
+        lastMessageAt: info.lastMessageAt,
+        model: meta.model || info.model || null,
+        provider: meta.modelProvider || info.provider || null
+      });
+    }
+
+    // 2. 扫描目录中的 jsonl 文件，发现不在 sessions.json 中的孤立会话（子代理等）
+    const files = await fs.readdir(SESSIONS_DIR);
+    for (const file of files) {
+      if (!file.endsWith('.jsonl') || file.includes('.deleted') || file.includes('.lock')) continue;
+      const sessionId = file.replace('.jsonl', '');
+      if (knownSessionIds.has(sessionId)) continue;
+
+      const sessionFile = path.join(SESSIONS_DIR, file);
+      const info = await parseSessionFile(sessionFile);
+
+      sessions.push({
+        key: `orphan:${sessionId}`,
+        sessionId,
+        kind: info.kind || 'isolated',
+        chatType: 'unknown',
+        channel: info.channelsSet.size > 0 ? [...info.channelsSet][0] : 'unknown',
+        channels: [...info.channelsSet],
+        label: info.label || '',
+        lastTo: '',
+        updatedAt: info.lastMessageTs || 0,
+        compactionCount: 0,
+        active: info.lastMessageTs ? (now - info.lastMessageTs < activeThreshold) : false,
+        messageCount: info.messageCount,
+        tokenCount: info.tokenCount,
+        fileSize: info.fileSize,
+        firstMessageAt: info.firstMessageAt,
+        lastMessageAt: info.lastMessageAt,
+        model: info.model || null,
+        provider: info.provider || null
       });
     }
 
@@ -113,6 +104,67 @@ router.get('/', async (req, res) => {
     res.status(500).json({ error: 'Failed to get sessions' });
   }
 });
+
+// 解析 jsonl 会话文件
+async function parseSessionFile(sessionFile: string) {
+  const result = {
+    messageCount: 0, tokenCount: 0, fileSize: 0,
+    firstMessageAt: null as string | null, lastMessageAt: null as string | null,
+    lastMessageTs: 0, channelsSet: new Set<string>(),
+    kind: '', label: '', model: '', provider: ''
+  };
+
+  if (!await fs.pathExists(sessionFile)) return result;
+
+  try {
+    const stat = await fs.stat(sessionFile);
+    result.fileSize = stat.size;
+    const content = await fs.readFile(sessionFile, 'utf-8');
+    const lines = content.trim().split('\n').filter((l: string) => l.length > 0);
+
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line);
+
+        // 提取会话元数据
+        if (entry.type === 'session') {
+          result.kind = entry.kind || result.kind;
+          result.label = entry.label || result.label;
+        }
+        if (entry.type === 'model_change') {
+          result.model = entry.modelId || result.model;
+          result.provider = entry.provider || result.provider;
+        }
+
+        if (entry.message?.role === 'user' || entry.message?.role === 'assistant') {
+          result.messageCount++;
+          const ts = entry.message?.timestamp || entry.timestamp;
+          if (ts) {
+            if (!result.firstMessageAt) result.firstMessageAt = ts;
+            result.lastMessageAt = ts;
+            const tsMs = new Date(ts).getTime();
+            if (tsMs > result.lastMessageTs) result.lastMessageTs = tsMs;
+          }
+        }
+        if (entry.message?.usage?.totalTokens) {
+          result.tokenCount += entry.message.usage.totalTokens;
+        }
+        if (entry.message?.role === 'user') {
+          let text = '';
+          if (typeof entry.message.content === 'string') {
+            text = entry.message.content;
+          } else if (Array.isArray(entry.message.content)) {
+            text = entry.message.content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n');
+          }
+          const ch = extractChannel(text);
+          if (ch) result.channelsSet.add(ch);
+        }
+      } catch {}
+    }
+  } catch {}
+
+  return result;
+}
 
 // GET /api/sessions/:sessionId/messages — 会话消息历史
 router.get('/:sessionId/messages', async (req, res) => {
