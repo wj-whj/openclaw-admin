@@ -33,7 +33,17 @@ router.post('/auth/start', async (req, res) => {
     authProcess.stdout.on('data', (data: Buffer) => {
       const text = data.toString();
       fullOutput += text;
+      processOutput(text);
+    });
 
+    authProcess.stderr.on('data', (data: Buffer) => {
+      const text = data.toString();
+      fullOutput += text;
+      processOutput(text);
+    });
+
+    // 处理输出的函数
+    function processOutput(text: string) {
       // 检测二维码开始标记
       if (text.includes('Scan this QR code')) {
         qrStarted = true;
@@ -75,15 +85,7 @@ router.post('/auth/start', async (req, res) => {
           authProcess = null;
         }
       }
-    });
-
-    authProcess.stderr.on('data', (data: Buffer) => {
-      const err = data.toString();
-      console.error('wacli stderr:', err);
-      if (err.includes('error') || err.includes('failed')) {
-        authStatus = 'failed';
-      }
-    });
+    }
 
     authProcess.on('close', (code: number) => {
       if (code !== 0 && authStatus !== 'success') {
