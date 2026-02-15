@@ -220,3 +220,58 @@ function getMimeType(filePath: string): string {
 }
 
 export default router;
+
+// GET /api/chat/history - 获取主会话最近的消息历史
+router.get('/history', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 50;
+    const sessionId = await getMainSessionId();
+    
+    // 读取 session 文件
+    const sessionPath = path.join(
+      os.homedir(), '.openclaw', 'agents', 'main', 'sessions', `${sessionId}.jsonl`
+    );
+
+    if (!await fs.pathExists(sessionPath)) {
+      return res.json({ messages: [] });
+    }
+
+    const content = await fs.readFile(sessionPath, 'utf-8');
+    const lines = content.trim().split('\n').filter(l => l.trim());
+    const messages: any[] = [];
+    
+    // 只取最后 limit 条
+    const recentLines = lines.slice(-limit * 2); // *2 因为可能有 tool 消息
+    
+    for (const line of recentLines) {
+      try {
+        const entry = JSON.parse(line);
+        const msg = entry.message || entry;
+        if (msg.role === 'user' || msg.role === 'assistant') {
+          let content = '';
+          if (typeof msg.content === 'string') {
+            content = msg.content;
+          } else if (Array.isArray(msg.content)) {
+            content = msg.content
+              .filter((c: any) => c.type === 'text')
+              .map((c: any) => c.text)
+              .join('\n');
+          }
+          if (content.trim()) {
+            messages.push({
+              id: entry.id || `${entry.timestamp || Date.now()}`,
+              role: msg.role,
+              content,
+              timestamp: new Date(entry.timestamp || Date.now()).getTime()
+            });
+          }
+        }
+      } catch {}
+    }
+
+    res.json({ messages: messages.slice(-limit) }); // 最新的在后面
+  } catch (error: any) {
+    console.error('[Chat] History error:', error.message);
+    res.status(500).json({ error: '获取历史失败', details: error.message });
+  }
+});

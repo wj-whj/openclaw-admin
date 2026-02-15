@@ -32,6 +32,7 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [lastSync, setLastSync] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -40,6 +41,30 @@ export default function ChatPage() {
   };
 
   useEffect(() => { scrollToBottom(); }, [messages, loading]);
+
+  // 定期同步会话历史（每 5 秒）
+  useEffect(() => {
+    const syncHistory = async () => {
+      try {
+        const token = localStorage.getItem('auth_token') || 'wj12345';
+        const resp = await fetch(`${API_BASE}/api/chat/history?limit=50`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data.messages && Array.isArray(data.messages)) {
+          setMessages(data.messages);
+          setLastSync(Date.now());
+        }
+      } catch (err) {
+        console.error('Sync history failed:', err);
+      }
+    };
+
+    syncHistory(); // 初始加载
+    const interval = setInterval(syncHistory, 5000); // 每 5 秒同步
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSend = async () => {
     if ((!input.trim() && pendingFiles.length === 0) || loading) return;
@@ -194,6 +219,11 @@ export default function ChatPage() {
               background: '#1bc47d', display: 'inline-block',
               boxShadow: '0 0 6px rgba(27, 196, 125, 0.5)'
             }} />
+            {lastSync > 0 && (
+              <span style={{ fontSize: 10, color: '#666', marginLeft: 4 }}>
+                已同步 {Math.floor((Date.now() - lastSync) / 1000)}s 前
+              </span>
+            )}
           </div>
           <button className="figma-button figma-button-secondary" onClick={clearChat}
             style={{ fontSize: 12, padding: '4px 12px' }}>清空对话</button>
