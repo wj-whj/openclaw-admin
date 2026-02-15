@@ -9,7 +9,7 @@ const execAsync = promisify(exec);
 // 维护历史数据
 const cpuHistory: number[] = [];
 const memoryHistory: number[] = [];
-const MAX_HISTORY = 20;
+const MAX_HISTORY = 30; // 增加历史长度以支持更长的平滑窗口
 
 export async function getDashboardData(): Promise<DashboardData & { system: { cpu: number; memory: number; cpuHistory: number[]; memoryHistory: number[] } }> {
   const [gatewayStatus, sessions, systemInfo, usage, channels] = await Promise.all([
@@ -26,12 +26,17 @@ export async function getDashboardData(): Promise<DashboardData & { system: { cp
   if (cpuHistory.length > MAX_HISTORY) cpuHistory.shift();
   if (memoryHistory.length > MAX_HISTORY) memoryHistory.shift();
 
-  // 平滑处理：取最近 3 次的平均值（减少瞬时波动）
-  const smoothCpu = cpuHistory.length >= 3
-    ? Math.round(cpuHistory.slice(-3).reduce((a, b) => a + b, 0) / Math.min(3, cpuHistory.length))
+  // 平滑处理：取最近 7 次的平均值（模拟活动监视器的平滑效果）
+  const smoothWindow = 7;
+  const smoothCpu = cpuHistory.length >= smoothWindow
+    ? Math.round(cpuHistory.slice(-smoothWindow).reduce((a, b) => a + b, 0) / smoothWindow)
+    : cpuHistory.length >= 3
+    ? Math.round(cpuHistory.slice(-3).reduce((a, b) => a + b, 0) / cpuHistory.length)
     : systemInfo.cpu;
-  const smoothMemory = memoryHistory.length >= 3
-    ? Math.round(memoryHistory.slice(-3).reduce((a, b) => a + b, 0) / Math.min(3, memoryHistory.length))
+  const smoothMemory = memoryHistory.length >= smoothWindow
+    ? Math.round(memoryHistory.slice(-smoothWindow).reduce((a, b) => a + b, 0) / smoothWindow)
+    : memoryHistory.length >= 3
+    ? Math.round(memoryHistory.slice(-3).reduce((a, b) => a + b, 0) / memoryHistory.length)
     : systemInfo.memory;
 
   return {
@@ -151,23 +156,16 @@ async function getUsageInfo() {
 
 async function getSystemInfo() {
   try {
-    // CPU: 用 top -l 2 获取第二次采样（更准确）
+    // CPU: 用 top -l 1 单次采样（轻量，不会触发额外 CPU 消耗）
     let cpu = 0;
     try {
-      const { stdout: topOutput } = await execAsync('top -l 2 -n 0', { timeout: 3000 });
-      const cpuLines = topOutput.match(/CPU usage:.*?idle/g);
-      if (cpuLines && cpuLines.length >= 2) {
-        // 取第二次采样
-        const secondSample = cpuLines[1];
-        const userMatch = secondSample.match(/([\d.]+)%\s*user/);
-        const sysMatch = secondSample.match(/([\d.]+)%\s*sys/);
-        if (userMatch && sysMatch) {
-          cpu = Math.round(parseFloat(userMatch[1]) + parseFloat(sysMatch[1]));
-        }
+      const { stdout: topOutput } = await execAsync('top -l 1 -n 0', { timeout: 2000 });
+      const userMatch = topOutput.match(/([\d.]+)%\s*user/);
+      const sysMatch = topOutput.match(/([\d.]+)%\s*sys/);
+      if (userMatch && sysMatch) {
+        cpu = Math.round(parseFloat(userMatch[1]) + parseFloat(sysMatch[1]));
       }
     } catch {
-      // fallback to single sample
-      const { stdout: topOutput } = await execAsync('top -l 1 -n 0');
       const idleMatch = topOutput.match(/([\d.]+)%\s*idle/);
       cpu = idleMatch ? Math.round(100 - parseFloat(idleMatch[1])) : 0;
     }
