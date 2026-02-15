@@ -1,91 +1,42 @@
 import express from 'express';
-import { spawn } from 'child_process';
+import { Client, LocalAuth } from 'whatsapp-web.js';
 import QRCode from 'qrcode';
 
 const router = express.Router();
 
-let authProcess: any = null;
+let client: any = null;
 let qrCodeImageUrl: string | null = null;
 let authStatus: 'idle' | 'waiting' | 'success' | 'failed' | 'timeout' = 'idle';
 
-// 启动 WhatsApp 认证并生成二维码图片
+// 启动 WhatsApp 认证
 router.post('/auth/start', async (req, res) => {
   try {
-    // 如果已有进程在运行，先清理
-    if (authProcess) {
-      authProcess.kill();
-      authProcess = null;
+    // 如果已有客户端在运行，先清理
+    if (client) {
+      await client.destroy();
+      client = null;
     }
 
     authStatus = 'waiting';
     qrCodeImageUrl = null;
 
-    // 启动 wacli auth，尝试捕获配对码
-    authProcess = spawn('wacli', ['auth'], {
-      env: { ...process.env }
-    });
-
-    let fullOutput = '';
-    let stderrOutput = '';
-    let qrCodeData: string | null = null;
-
-    authProcess.stdout.on('data', (data: Buffer) => {
-      fullOutput += data.toString();
-    });
-
-    authProcess.stderr.on('data', (data: Buffer) => {
-      const text = data.toString();
-      stderrOutput += text;
-      
-      // 尝试从输出中提取二维码数据
-      // WhatsApp 二维码格式通常是: ref@jid,key,advSecret
-      // 或者是一个长字符串
-      const lines = text.split('\n');
-      for (const line of lines) {
-        // 查找包含 @ 符号的长字符串（可能是配对码）
-        if (line.includes('@') && line.length > 50 && !line.includes('█')) {
-          const match = line.match(/([0-9A-Za-z+/=@,]+)/);
-          if (match && match[1].length > 50) {
-            qrCodeData = match[1];
-            break;
-          }
-        }
-      }
-
-      // 检测认证成功
-      if (text.includes('Authenticated') || text.includes('successfully')) {
-        authStatus = 'success';
-        qrCodeImageUrl = null;
-        if (authProcess) {
-          authProcess.kill();
-          authProcess = null;
-        }
-      }
-
-      // 检测超时
-      if (text.includes('timed out')) {
-        authStatus = 'timeout';
-        if (authProcess) {
-          authProcess.kill();
-          authProcess = null;
-        }
+    // 创建 WhatsApp 客户端
+    client = new Client({
+      authStrategy: new LocalAuth({
+        dataPath: '/tmp/whatsapp-session'
+      }),
+      puppeteer: {
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
       }
     });
 
-    authProcess.on('close', (code: number) => {
-      if (code !== 0 && authStatus !== 'success') {
-        authStatus = code === 1 && stderrOutput.includes('timed out') ? 'timeout' : 'failed';
-      }
-      authProcess = null;
-    });
-
-    // 等待二维码数据
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    // 如果找到了配对码，生成二维码图片
-    if (qrCodeData) {
+    // 监听二维码事件
+    client.on('qr', async (qr: string) => {
+      console.log('QR code received:', qr.substring(0, 50) + '...');
       try {
-        qrCodeImageUrl = await QRCode.toDataURL(qrCodeData, {
+        // 生成二维码图片
+        qrCodeImageUrl = await QRCode.toDataURL(qr, {
           width: 400,
           margin: 2,
           color: {
@@ -93,28 +44,43 @@ router.post('/auth/start', async (req, res) => {
             light: '#FFFFFF'
           }
         });
+        authStatus = 'waiting';
       } catch (error) {
         console.error('Failed to generate QR code:', error);
       }
-    }
+    });
 
-    // 如果没有找到配对码，使用备用方案：打开终端
-    if (!qrCodeImageUrl) {
-      const { exec } = require('child_process');
-      const script = `
-        tell application "Terminal"
-          activate
-          do script "clear && echo '═══════════════════════════════════════' && echo '   WhatsApp 扫码连接' && echo '═══════════════════════════════════════' && echo '' && wacli auth"
-        end tell
-      `;
-      exec(`osascript -e '${script}'`);
-    }
+    // 监听认证成功
+    client.on('ready', () => {
+      console.log('WhatsApp client is ready!');
+      authStatus = 'success';
+      qrCodeImageUrl = null;
+    });
+
+    // 监听认证失败
+    client.on('auth_failure', () => {
+      console.log('Authentication failed');
+      authStatus = 'failed';
+    });
+
+    // 监听断开连接
+    client.on('disconnected', () => {
+      console.log('Client disconnected');
+      if (authStatus === 'waiting') {
+        authStatus = 'timeout';
+      }
+    });
+
+    // 初始化客户端
+    await client.initialize();
+
+    // 等待二维码生成
+    await new Promise((resolve) => setTimeout(resolve, 5000));
 
     res.json({
       status: authStatus,
       qrCode: qrCodeImageUrl,
-      fallback: !qrCodeImageUrl,
-      message: qrCodeImageUrl ? '请扫描二维码' : '已打开终端窗口，请在终端中扫描'
+      message: qrCodeImageUrl ? '请扫描二维码' : '正在生成二维码...'
     });
 
   } catch (error: any) {
@@ -125,41 +91,30 @@ router.post('/auth/start', async (req, res) => {
 });
 
 // 获取认证状态（轮询用）
-router.get('/auth/status', async (req, res) => {
-  try {
-    const { execSync } = require('child_process');
-    const output = execSync('wacli doctor 2>&1', { encoding: 'utf-8' });
-    const isAuthenticated = output.includes('authenticated') || output.includes('✓') || output.includes('OK');
-    
-    if (isAuthenticated) {
-      authStatus = 'success';
-    }
-
-    res.json({
-      status: authStatus,
-      qrCode: qrCodeImageUrl,
-      authenticated: isAuthenticated,
-      message: authStatus === 'waiting' ? '等待扫码' :
-               authStatus === 'success' ? '认证成功！' :
-               authStatus === 'timeout' ? '二维码已超时' :
-               authStatus === 'failed' ? '认证失败' :
-               '未开始'
-    });
-  } catch (error) {
-    res.json({
-      status: authStatus,
-      qrCode: qrCodeImageUrl,
-      authenticated: false,
-      message: '检查状态失败'
-    });
-  }
+router.get('/auth/status', (req, res) => {
+  const isReady = client && client.info;
+  
+  res.json({
+    status: authStatus,
+    qrCode: qrCodeImageUrl,
+    authenticated: isReady,
+    message: authStatus === 'waiting' ? (qrCodeImageUrl ? '请扫描二维码' : '正在生成...') :
+             authStatus === 'success' ? '认证成功！' :
+             authStatus === 'timeout' ? '二维码已超时' :
+             authStatus === 'failed' ? '认证失败' :
+             '未开始'
+  });
 });
 
 // 取消认证
-router.post('/auth/cancel', (req, res) => {
-  if (authProcess) {
-    authProcess.kill();
-    authProcess = null;
+router.post('/auth/cancel', async (req, res) => {
+  if (client) {
+    try {
+      await client.destroy();
+    } catch (error) {
+      console.error('Failed to destroy client:', error);
+    }
+    client = null;
   }
   authStatus = 'idle';
   qrCodeImageUrl = null;
