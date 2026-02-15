@@ -141,7 +141,16 @@ export default function MonitorPage() {
   }
 
   // 环形进度图
-  const CircularProgress = ({ value, color, size = 120 }: { value: number; color: string; size?: number }) => {
+    // 根据数值返回对应颜色：绿色(0-40) → 蓝色(40-60) → 橙色(60-80) → 红色(80-100)
+  const getUsageColor = (value: number): string => {
+    if (value < 40) return '#1bc47d';
+    if (value < 60) return '#4e8ff0';
+    if (value < 80) return '#f0a020';
+    return '#e84855';
+  };
+
+  const CircularProgress = ({ value, size = 120 }: { value: number; size?: number }) => {
+    const color = getUsageColor(value);
     const radius = (size - 20) / 2;
     const circumference = 2 * Math.PI * radius;
     const offset = circumference - (value / 100) * circumference;
@@ -161,8 +170,9 @@ export default function MonitorPage() {
   };
 
   // 迷你折线图
-  const MiniChart = ({ data, color }: { data: number[]; color: string }) => {
+  const MiniChart = ({ data }: { data: number[] }) => {
     if (!data || data.length < 2) return null;
+    const color = getUsageColor(data[data.length - 1]);
     const width = 100;
     const height = 40;
     const max = Math.max(...data, 1);
@@ -250,15 +260,15 @@ export default function MonitorPage() {
           <div className="figma-panel">
             <div className="figma-panel-header">
               <div className="figma-panel-title">CPU 使用率</div>
-              <span className={`figma-badge figma-badge-${dashboard.system.cpu > 80 ? 'red' : 'green'}`}>
-                {dashboard.system.cpu > 80 ? '高负载' : '正常'}
+              <span className={`figma-badge figma-badge-${dashboard.system.cpu >= 80 ? 'red' : dashboard.system.cpu >= 60 ? 'yellow' : 'green'}`}>
+                {dashboard.system.cpu >= 80 ? '高负载' : dashboard.system.cpu >= 60 ? '较高' : '正常'}
               </span>
             </div>
             <div className="figma-panel-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <CircularProgress value={dashboard.system.cpu} color="var(--figma-blue)" size={100} />
+              <CircularProgress value={dashboard.system.cpu} size={100} />
               <div style={{ marginTop: 12, width: '100%' }}>
                 <div style={{ fontSize: 11, color: '#cccccc', marginBottom: 4 }}>趋势</div>
-                <MiniChart data={cpuHistory} color="var(--figma-blue)" />
+                <MiniChart data={cpuHistory} />
               </div>
             </div>
           </div>
@@ -267,15 +277,15 @@ export default function MonitorPage() {
           <div className="figma-panel">
             <div className="figma-panel-header">
               <div className="figma-panel-title">内存使用率</div>
-              <span className={`figma-badge figma-badge-${dashboard.system.memory > 80 ? 'red' : 'green'}`}>
-                {dashboard.system.memory > 80 ? '高占用' : '正常'}
+              <span className={`figma-badge figma-badge-${dashboard.system.memory >= 80 ? 'red' : dashboard.system.memory >= 60 ? 'yellow' : 'green'}`}>
+                {dashboard.system.memory >= 80 ? '高占用' : dashboard.system.memory >= 60 ? '较高' : '正常'}
               </span>
             </div>
             <div className="figma-panel-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <CircularProgress value={dashboard.system.memory} color="var(--figma-green)" size={100} />
+              <CircularProgress value={dashboard.system.memory} size={100} />
               <div style={{ marginTop: 12, width: '100%' }}>
                 <div style={{ fontSize: 11, color: '#cccccc', marginBottom: 4 }}>趋势</div>
-                <MiniChart data={memHistory} color="var(--figma-green)" />
+                <MiniChart data={memHistory} />
               </div>
             </div>
           </div>
