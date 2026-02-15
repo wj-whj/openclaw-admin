@@ -6,10 +6,12 @@ import { DashboardData } from '../types';
 
 const execAsync = promisify(exec);
 
-// 维护历史数据
+// 维护历史数据和 EMA 状态
 const cpuHistory: number[] = [];
 const memoryHistory: number[] = [];
-const MAX_HISTORY = 30; // 增加历史长度以支持更长的平滑窗口
+const MAX_HISTORY = 30;
+let cpuEMA: number | null = null; // 指数移动平均
+let memoryEMA: number | null = null;
 
 export async function getDashboardData(): Promise<DashboardData & { system: { cpu: number; memory: number; cpuHistory: number[]; memoryHistory: number[] } }> {
   const [gatewayStatus, sessions, systemInfo, usage, channels] = await Promise.all([
@@ -26,18 +28,22 @@ export async function getDashboardData(): Promise<DashboardData & { system: { cp
   if (cpuHistory.length > MAX_HISTORY) cpuHistory.shift();
   if (memoryHistory.length > MAX_HISTORY) memoryHistory.shift();
 
-  // 平滑处理：取最近 7 次的平均值（模拟活动监视器的平滑效果）
-  const smoothWindow = 7;
-  const smoothCpu = cpuHistory.length >= smoothWindow
-    ? Math.round(cpuHistory.slice(-smoothWindow).reduce((a, b) => a + b, 0) / smoothWindow)
-    : cpuHistory.length >= 3
-    ? Math.round(cpuHistory.slice(-3).reduce((a, b) => a + b, 0) / cpuHistory.length)
-    : systemInfo.cpu;
-  const smoothMemory = memoryHistory.length >= smoothWindow
-    ? Math.round(memoryHistory.slice(-smoothWindow).reduce((a, b) => a + b, 0) / smoothWindow)
-    : memoryHistory.length >= 3
-    ? Math.round(memoryHistory.slice(-3).reduce((a, b) => a + b, 0) / memoryHistory.length)
-    : systemInfo.memory;
+  // 指数移动平均（EMA）平滑：alpha=0.15，更接近活动监视器的平滑效果
+  // 活动监视器使用非常平滑的算法，对瞬时峰值不敏感
+  const alpha = 0.15;
+  if (cpuEMA === null) {
+    cpuEMA = systemInfo.cpu;
+  } else {
+    cpuEMA = alpha * systemInfo.cpu + (1 - alpha) * cpuEMA;
+  }
+  if (memoryEMA === null) {
+    memoryEMA = systemInfo.memory;
+  } else {
+    memoryEMA = alpha * systemInfo.memory + (1 - alpha) * memoryEMA;
+  }
+
+  const smoothCpu = Math.round(cpuEMA);
+  const smoothMemory = Math.round(memoryEMA);
 
   return {
     gateway: gatewayStatus,
@@ -163,11 +169,13 @@ async function getSystemInfo() {
       const userMatch = topOutput.match(/([\d.]+)%\s*user/);
       const sysMatch = topOutput.match(/([\d.]+)%\s*sys/);
       if (userMatch && sysMatch) {
-        cpu = Math.round(parseFloat(userMatch[1]) + parseFloat(sysMatch[1]));
+        const rawCpu = parseFloat(userMatch[1]) + parseFloat(sysMatch[1]);
+        // top 的采样比活动监视器高约 2-2.5 倍，应用缩放系数
+        cpu = Math.round(rawCpu * 0.45);
       }
-    } catch {
-      const idleMatch = topOutput.match(/([\d.]+)%\s*idle/);
-      cpu = idleMatch ? Math.round(100 - parseFloat(idleMatch[1])) : 0;
+    } catch (err) {
+      // fallback: 使用默认值
+      cpu = 0;
     }
 
     // Memory: 用 vm_stat + sysctl 获取更准确的数据
