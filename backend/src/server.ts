@@ -10,6 +10,7 @@ import logsRouter from './routes/logs';
 import providersRouter from './routes/providers';
 import tasksRouter from './routes/tasks';
 import channelsRouter from './routes/channels';
+import whatsappRouter from './routes/whatsapp';
 
 const app = express();
 const httpServer = createServer(app);
@@ -56,6 +57,7 @@ app.use('/api/logs', logsRouter);
 app.use('/api/providers', providersRouter);
 app.use('/api/tasks', tasksRouter);
 app.use('/api/channels', channelsRouter);
+app.use('/api/whatsapp', whatsappRouter);
 
 // WebSocket
 io.on('connection', (socket) => {

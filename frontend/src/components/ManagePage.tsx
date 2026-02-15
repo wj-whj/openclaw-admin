@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button, Input, Switch, Row, Col, message } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, SaveOutlined, ClockCircleOutlined, MessageOutlined, EyeOutlined, SearchOutlined, LeftOutlined, ApiOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import { getProviders, createProvider, updateProvider, deleteProvider, setDefaultModel, getTasks, createCronJob, updateCronJob, deleteCronJob, getSessions, getSessionMessages, deleteSession, getChannels, createChannel, updateChannel, deleteChannel, testChannel } from '../services/api';
+import { getProviders, createProvider, updateProvider, deleteProvider, setDefaultModel, getTasks, createCronJob, updateCronJob, deleteCronJob, getSessions, getSessionMessages, deleteSession, getChannels, createChannel, updateChannel, deleteChannel, testChannel, openWhatsAppQR, getWhatsAppStatus } from '../services/api';
 
 interface ProviderModel {
   id: string;
@@ -1019,9 +1019,34 @@ export default function ManagePage() {
                 {newChannel.type === 'whatsapp' && (
                   <Col span={12}>
                     <div style={{ fontSize: 11, color: '#ccc', marginBottom: 4 }}>配置方式</div>
-                    <div style={{ fontSize: 11, color: '#999', padding: '8px 0' }}>
-                      使用 wacli 扫码连接（无需 Token）<br/>
-                      或配置 WhatsApp Business API Token
+                    <button
+                      onClick={async () => {
+                        try {
+                          await openWhatsAppQR();
+                          message.success('已打开扫码窗口，请在新窗口中扫描二维码');
+                        } catch {
+                          message.error('打开失败');
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        background: 'var(--figma-green)',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        color: '#fff',
+                        padding: '8px 12px',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6
+                      }}
+                    >
+                      📱 打开扫码窗口
+                    </button>
+                    <div style={{ fontSize: 10, color: '#999', marginTop: 6, textAlign: 'center' }}>
+                      使用 wacli 扫码连接（无需 Token）
                     </div>
                   </Col>
                 )}
@@ -1175,8 +1200,36 @@ export default function ManagePage() {
                               {channel.type === 'irc' && 'Server 地址 (留空保持不变)'}
                             </div>
                             {channel.type === 'whatsapp' ? (
-                              <div style={{ fontSize: 10, color: '#999', padding: '6px 0' }}>
-                                💡 提示：WhatsApp 推荐使用 wacli 扫码连接，无需 Token
+                              <div>
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await openWhatsAppQR();
+                                      message.success('已打开扫码窗口，请在新窗口中扫描二维码');
+                                    } catch {
+                                      message.error('打开失败');
+                                    }
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    background: 'var(--figma-green)',
+                                    border: 'none',
+                                    borderRadius: 'var(--radius-sm)',
+                                    color: '#fff',
+                                    padding: '6px 10px',
+                                    cursor: 'pointer',
+                                    fontSize: 11,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 4
+                                  }}
+                                >
+                                  📱 打开扫码窗口
+                                </button>
+                                <div style={{ fontSize: 9, color: '#999', marginTop: 4, textAlign: 'center' }}>
+                                  使用 wacli 扫码连接（无需 Token）
+                                </div>
                               </div>
                             ) : (
                               <Input.Password size="small"
