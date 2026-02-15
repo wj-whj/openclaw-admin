@@ -255,16 +255,33 @@ export default function MonitorPage() {
         </Col>
       </Row>
 
-      {/* Channels Status */}
-      {dashboard.channels && dashboard.channels.length > 0 && (
-        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-          <Col span={24}>
+      {/* System Resources + Channels Status */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col span={6}>
+          <div className="figma-panel">
+            <div className="figma-panel-header">
+              <div className="figma-panel-title">CPU 使用率</div>
+              <span className={`figma-badge figma-badge-${dashboard.system.cpu >= 80 ? 'red' : dashboard.system.cpu >= 60 ? 'yellow' : 'green'}`}>
+                {dashboard.system.cpu >= 80 ? '高负载' : dashboard.system.cpu >= 60 ? '较高' : '正常'}
+              </span>
+            </div>
+            <div className="figma-panel-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <CircularProgress value={dashboard.system.cpu} size={100} />
+              <div style={{ marginTop: 12, width: '100%' }}>
+                <div style={{ fontSize: 11, color: '#cccccc', marginBottom: 4 }}>趋势</div>
+                <MiniChart data={cpuHistory} />
+              </div>
+            </div>
+          </div>
+        </Col>
+        {dashboard.channels && dashboard.channels.length > 0 && (
+          <Col span={12}>
             <div className="figma-panel">
               <div className="figma-panel-header">
                 <div className="figma-panel-title">Channels 连接状态</div>
               </div>
               <div className="figma-panel-body">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-3)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--space-3)' }}>
                   {dashboard.channels.map(ch => (
                     <div key={ch.name} style={{
                       padding: 'var(--space-3)',
@@ -300,8 +317,73 @@ export default function MonitorPage() {
               </div>
             </div>
           </Col>
-        </Row>
-      )}
+        )}
+      </Row>
+
+      {/* Sessions + Subagents */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col span={12}>
+          <div className="figma-panel">
+            <div className="figma-panel-header">
+              <div className="figma-panel-title">内存使用率</div>
+              <span className={`figma-badge figma-badge-${dashboard.system.memory >= 80 ? 'red' : dashboard.system.memory >= 60 ? 'yellow' : 'green'}`}>
+                {dashboard.system.memory >= 80 ? '高占用' : dashboard.system.memory >= 60 ? '较高' : '正常'}
+              </span>
+            </div>
+            <div className="figma-panel-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <CircularProgress value={dashboard.system.memory} size={100} />
+              <div style={{ marginTop: 12, width: '100%' }}>
+                <div style={{ fontSize: 11, color: '#cccccc', marginBottom: 4 }}>趋势</div>
+                <MiniChart data={memHistory} />
+              </div>
+            </div>
+          </div>
+        </Col>
+        {dashboard.channels && dashboard.channels.length > 0 && (
+          <Col span={12}>
+            <div className="figma-panel">
+              <div className="figma-panel-header">
+                <div className="figma-panel-title">Channels 连接状态</div>
+              </div>
+              <div className="figma-panel-body">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--space-3)' }}>
+                  {dashboard.channels.map(ch => (
+                    <div key={ch.name} style={{
+                      padding: 'var(--space-3)',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 'var(--radius-sm)',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}>
+                      {ch.state === 'OK' && (
+                        <div style={{
+                          position: 'absolute', left: 0, top: 0, bottom: 0, width: 3,
+                          background: 'var(--figma-green)'
+                        }} />
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, paddingLeft: ch.state === 'OK' ? 8 : 0 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{ch.name}</span>
+                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                          <span className={`figma-badge figma-badge-${ch.enabled ? 'green' : 'gray'}`}>
+                            {ch.enabled ? 'ON' : 'OFF'}
+                          </span>
+                          <span className={`figma-badge figma-badge-${ch.state === 'OK' ? 'green' : 'red'}`}>
+                            {ch.state}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#999999', lineHeight: 1.4 }}>
+                        {ch.detail}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Col>
+        )}
+      </Row>
 
       {/* Model Token Usage Chart */}
       {dashboard.usage.modelStats && dashboard.usage.modelStats.length > 0 && (
@@ -353,49 +435,15 @@ export default function MonitorPage() {
         </Row>
       )}
 
-      {/* System Resources + Sessions + Subagents */}
+      {/* Sessions + Subagents */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col span={6}>
-          <div className="figma-panel">
-            <div className="figma-panel-header">
-              <div className="figma-panel-title">CPU 使用率</div>
-              <span className={`figma-badge figma-badge-${dashboard.system.cpu >= 80 ? 'red' : dashboard.system.cpu >= 60 ? 'yellow' : 'green'}`}>
-                {dashboard.system.cpu >= 80 ? '高负载' : dashboard.system.cpu >= 60 ? '较高' : '正常'}
-              </span>
-            </div>
-            <div className="figma-panel-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <CircularProgress value={dashboard.system.cpu} size={100} />
-              <div style={{ marginTop: 12, width: '100%' }}>
-                <div style={{ fontSize: 11, color: '#cccccc', marginBottom: 4 }}>趋势</div>
-                <MiniChart data={cpuHistory} />
-              </div>
-            </div>
-          </div>
-        </Col>
-        <Col span={6}>
-          <div className="figma-panel">
-            <div className="figma-panel-header">
-              <div className="figma-panel-title">内存使用率</div>
-              <span className={`figma-badge figma-badge-${dashboard.system.memory >= 80 ? 'red' : dashboard.system.memory >= 60 ? 'yellow' : 'green'}`}>
-                {dashboard.system.memory >= 80 ? '高占用' : dashboard.system.memory >= 60 ? '较高' : '正常'}
-              </span>
-            </div>
-            <div className="figma-panel-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <CircularProgress value={dashboard.system.memory} size={100} />
-              <div style={{ marginTop: 12, width: '100%' }}>
-                <div style={{ fontSize: 11, color: '#cccccc', marginBottom: 4 }}>趋势</div>
-                <MiniChart data={memHistory} />
-              </div>
-            </div>
-          </div>
-        </Col>
-        <Col span={6}>
+        <Col span={12}>
           <div className="figma-panel">
             <div className="figma-panel-header">
               <div className="figma-panel-title">会话列表</div>
               <span className="figma-badge figma-badge-blue">{sessions.length} 个</span>
             </div>
-            <div className="figma-panel-body" style={{ maxHeight: 260, overflowY: 'auto' }}>
+            <div className="figma-panel-body" style={{ maxHeight: 300, overflowY: 'auto' }}>
               {sessions.length === 0 ? (
                 <div style={{ fontSize: 12, color: '#999', textAlign: 'center', padding: 20 }}>暂无会话</div>
               ) : sessions.map((session, index) => (
@@ -440,13 +488,13 @@ export default function MonitorPage() {
             </div>
           </div>
         </Col>
-        <Col span={6}>
+        <Col span={12}>
           <div className="figma-panel">
             <div className="figma-panel-header">
               <div className="figma-panel-title">子代理任务</div>
               <span className="figma-badge figma-badge-yellow">{subagentTasks.length} 个</span>
             </div>
-            <div className="figma-panel-body" style={{ maxHeight: 260, overflowY: 'auto' }}>
+            <div className="figma-panel-body" style={{ maxHeight: 300, overflowY: 'auto' }}>
               {subagentTasks.length === 0 ? (
                 <div style={{ fontSize: 12, color: '#999', textAlign: 'center', padding: 20 }}>暂无子代理</div>
               ) : subagentTasks.map((task, index) => (
