@@ -293,11 +293,11 @@ export default function MonitorPage() {
         </Col>
         {dashboard.channels && dashboard.channels.length > 0 && (
           <Col span={12}>
-            <div className="figma-panel">
+            <div className="figma-panel" style={{ height: '100%' }}>
               <div className="figma-panel-header">
                 <div className="figma-panel-title">Channels 连接状态</div>
               </div>
-              <div className="figma-panel-body">
+              <div className="figma-panel-body" style={{ maxHeight: 180, overflowY: 'auto' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--space-3)' }}>
                   {dashboard.channels.map(ch => (
                     <div key={ch.name} style={{
@@ -337,15 +337,15 @@ export default function MonitorPage() {
         )}
       </Row>
 
-      {/* Model Token Usage Chart */}
-      {dashboard.usage.modelStats && dashboard.usage.modelStats.length > 0 && (
-        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-          <Col span={24}>
+      {/* Model Token Usage + Sessions + Subagents */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        {dashboard.usage.modelStats && dashboard.usage.modelStats.length > 0 && (
+          <Col span={8}>
             <div className="figma-panel">
               <div className="figma-panel-header">
                 <div className="figma-panel-title">模型 Token 使用统计（今日）</div>
               </div>
-              <div className="figma-panel-body">
+              <div className="figma-panel-body" style={{ maxHeight: 300, overflowY: 'auto' }}>
                 <div style={{ padding: 'var(--space-3)' }}>
                   {dashboard.usage.modelStats.map((stat, idx) => {
                     const maxTokens = Math.max(...dashboard.usage.modelStats!.map(s => s.tokens));
@@ -384,12 +384,8 @@ export default function MonitorPage() {
               </div>
             </div>
           </Col>
-        </Row>
-      )}
-
-      {/* Sessions + Subagents */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col span={12}>
+        )}
+        <Col span={dashboard.usage.modelStats && dashboard.usage.modelStats.length > 0 ? 8 : 12}>
           <div className="figma-panel">
             <div className="figma-panel-header">
               <div className="figma-panel-title">会话列表</div>
@@ -440,7 +436,7 @@ export default function MonitorPage() {
             </div>
           </div>
         </Col>
-        <Col span={12}>
+        <Col span={dashboard.usage.modelStats && dashboard.usage.modelStats.length > 0 ? 8 : 12}>
           <div className="figma-panel">
             <div className="figma-panel-header">
               <div className="figma-panel-title">子代理任务</div>
