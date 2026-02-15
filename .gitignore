@@ -2,6 +2,7 @@ node_modules/
 dist/
 *.log
 .DS_Store
+.env
 .env.local
 .env.*.local
 npm-debug.log*
@@ -9,3 +10,5 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+.wwebjs_cache/
+.wwebjs_auth/
