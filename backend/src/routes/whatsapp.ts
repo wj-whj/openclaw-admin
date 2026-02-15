@@ -1,14 +1,14 @@
 import express from 'express';
-import { exec, spawn } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
+import QRCode from 'qrcode';
 
-const execAsync = promisify(exec);
 const router = express.Router();
 
 let authProcess: any = null;
+let qrCodeImageUrl: string | null = null;
 let authStatus: 'idle' | 'waiting' | 'success' | 'failed' | 'timeout' = 'idle';
 
-// 打开终端窗口显示二维码
+// 启动 WhatsApp 认证并生成二维码图片
 router.post('/auth/start', async (req, res) => {
   try {
     // 如果已有进程在运行，先清理
@@ -18,46 +18,105 @@ router.post('/auth/start', async (req, res) => {
     }
 
     authStatus = 'waiting';
+    qrCodeImageUrl = null;
 
-    // 使用 osascript 打开新的终端窗口并运行 wacli auth
-    const script = `
-      tell application "Terminal"
-        activate
-        set newTab to do script "clear && echo '═══════════════════════════════════════' && echo '   WhatsApp 扫码连接' && echo '═══════════════════════════════════════' && echo '' && echo '请用手机 WhatsApp 扫描下方二维码：' && echo '' && wacli auth && echo '' && echo '扫码完成后可关闭此窗口'"
-        set custom title of newTab to "WhatsApp 扫码"
-      end tell
-    `;
-    
-    exec(`osascript -e '${script}'`, (error) => {
-      if (error) {
-        console.error('Failed to open terminal:', error);
-        authStatus = 'failed';
+    // 启动 wacli auth，尝试捕获配对码
+    authProcess = spawn('wacli', ['auth'], {
+      env: { ...process.env }
+    });
+
+    let fullOutput = '';
+    let stderrOutput = '';
+    let qrCodeData: string | null = null;
+
+    authProcess.stdout.on('data', (data: Buffer) => {
+      fullOutput += data.toString();
+    });
+
+    authProcess.stderr.on('data', (data: Buffer) => {
+      const text = data.toString();
+      stderrOutput += text;
+      
+      // 尝试从输出中提取二维码数据
+      // WhatsApp 二维码格式通常是: ref@jid,key,advSecret
+      // 或者是一个长字符串
+      const lines = text.split('\n');
+      for (const line of lines) {
+        // 查找包含 @ 符号的长字符串（可能是配对码）
+        if (line.includes('@') && line.length > 50 && !line.includes('█')) {
+          const match = line.match(/([0-9A-Za-z+/=@,]+)/);
+          if (match && match[1].length > 50) {
+            qrCodeData = match[1];
+            break;
+          }
+        }
+      }
+
+      // 检测认证成功
+      if (text.includes('Authenticated') || text.includes('successfully')) {
+        authStatus = 'success';
+        qrCodeImageUrl = null;
+        if (authProcess) {
+          authProcess.kill();
+          authProcess = null;
+        }
+      }
+
+      // 检测超时
+      if (text.includes('timed out')) {
+        authStatus = 'timeout';
+        if (authProcess) {
+          authProcess.kill();
+          authProcess = null;
+        }
       }
     });
 
-    // 启动后台进程监听认证状态
-    setTimeout(() => {
-      authProcess = spawn('wacli', ['doctor'], {
-        env: { ...process.env }
-      });
+    authProcess.on('close', (code: number) => {
+      if (code !== 0 && authStatus !== 'success') {
+        authStatus = code === 1 && stderrOutput.includes('timed out') ? 'timeout' : 'failed';
+      }
+      authProcess = null;
+    });
 
-      let output = '';
-      authProcess.stdout.on('data', (data: Buffer) => {
-        output += data.toString();
-      });
+    // 等待二维码数据
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
-      authProcess.on('close', () => {
-        if (output.includes('authenticated') || output.includes('✓') || output.includes('OK')) {
-          authStatus = 'success';
-        }
-        authProcess = null;
-      });
-    }, 5000);
+    // 如果找到了配对码，生成二维码图片
+    if (qrCodeData) {
+      try {
+        qrCodeImageUrl = await QRCode.toDataURL(qrCodeData, {
+          width: 400,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        });
+      } catch (error) {
+        console.error('Failed to generate QR code:', error);
+      }
+    }
+
+    // 如果没有找到配对码，使用备用方案：打开终端
+    if (!qrCodeImageUrl) {
+      const { exec } = require('child_process');
+      const script = `
+        tell application "Terminal"
+          activate
+          do script "clear && echo '═══════════════════════════════════════' && echo '   WhatsApp 扫码连接' && echo '═══════════════════════════════════════' && echo '' && wacli auth"
+        end tell
+      `;
+      exec(`osascript -e '${script}'`);
+    }
 
     res.json({
-      status: 'opened',
-      message: '已打开终端窗口，请在终端中扫描二维码'
+      status: authStatus,
+      qrCode: qrCodeImageUrl,
+      fallback: !qrCodeImageUrl,
+      message: qrCodeImageUrl ? '请扫描二维码' : '已打开终端窗口，请在终端中扫描'
     });
+
   } catch (error: any) {
     console.error('WhatsApp auth error:', error);
     authStatus = 'failed';
@@ -65,12 +124,12 @@ router.post('/auth/start', async (req, res) => {
   }
 });
 
-// 获取认证状态
+// 获取认证状态（轮询用）
 router.get('/auth/status', async (req, res) => {
   try {
-    // 实时检查 wacli 状态
-    const { stdout } = await execAsync('wacli doctor 2>&1');
-    const isAuthenticated = stdout.includes('authenticated') || stdout.includes('✓') || stdout.includes('OK');
+    const { execSync } = require('child_process');
+    const output = execSync('wacli doctor 2>&1', { encoding: 'utf-8' });
+    const isAuthenticated = output.includes('authenticated') || output.includes('✓') || output.includes('OK');
     
     if (isAuthenticated) {
       authStatus = 'success';
@@ -78,15 +137,18 @@ router.get('/auth/status', async (req, res) => {
 
     res.json({
       status: authStatus,
+      qrCode: qrCodeImageUrl,
       authenticated: isAuthenticated,
-      message: authStatus === 'waiting' ? '等待扫码...' :
+      message: authStatus === 'waiting' ? '等待扫码' :
                authStatus === 'success' ? '认证成功！' :
+               authStatus === 'timeout' ? '二维码已超时' :
                authStatus === 'failed' ? '认证失败' :
                '未开始'
     });
   } catch (error) {
     res.json({
       status: authStatus,
+      qrCode: qrCodeImageUrl,
       authenticated: false,
       message: '检查状态失败'
     });
@@ -100,6 +162,7 @@ router.post('/auth/cancel', (req, res) => {
     authProcess = null;
   }
   authStatus = 'idle';
+  qrCodeImageUrl = null;
   res.json({ status: 'cancelled' });
 });
 

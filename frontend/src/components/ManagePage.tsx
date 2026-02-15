@@ -367,30 +367,37 @@ export default function ManagePage() {
     try {
       setShowWhatsAppQR(true);
       setWhatsappAuthStatus('waiting');
+      setWhatsappQRCode(null);
       
       const res = await startWhatsAppAuth();
-      setWhatsappAuthStatus('waiting');
-      message.success('终端窗口已打开，请在终端中扫描二维码');
+      setWhatsappQRCode(res.data.qrCode);
+      setWhatsappAuthStatus(res.data.status);
+      
+      if (res.data.fallback) {
+        message.info('已打开终端窗口，请在终端中扫描二维码');
+      }
       
       // 开始轮询状态
       const pollInterval = setInterval(async () => {
         try {
           const statusRes = await getWhatsAppAuthStatus();
+          if (statusRes.data.qrCode && !whatsappQRCode) {
+            setWhatsappQRCode(statusRes.data.qrCode);
+          }
           setWhatsappAuthStatus(statusRes.data.status);
           
           if (statusRes.data.authenticated || statusRes.data.status === 'success') {
             clearInterval(pollInterval);
             message.success('WhatsApp 认证成功！');
             setShowWhatsAppQR(false);
-            setWhatsappAuthStatus('success');
-          } else if (statusRes.data.status === 'failed') {
+          } else if (statusRes.data.status === 'timeout' || statusRes.data.status === 'failed') {
             clearInterval(pollInterval);
-            message.error('认证失败，请重试');
+            message.error(statusRes.data.message);
           }
         } catch (error) {
           clearInterval(pollInterval);
         }
-      }, 3000);
+      }, 2000);
       
       // 60秒后停止轮询
       setTimeout(() => clearInterval(pollInterval), 60000);
@@ -1452,50 +1459,70 @@ export default function ManagePage() {
             </div>
 
             <div style={{
-              background: 'var(--bg-tertiary)',
-              padding: 30,
+              background: whatsappQRCode ? '#fff' : 'var(--bg-tertiary)',
+              padding: whatsappQRCode ? 20 : 30,
               borderRadius: 8,
               marginBottom: 20,
-              textAlign: 'center'
+              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: 300
             }}>
-              {whatsappAuthStatus === 'waiting' && (
-                <>
+              {whatsappAuthStatus === 'waiting' && !whatsappQRCode && (
+                <div>
                   <div style={{ fontSize: 48, marginBottom: 16 }}>💻</div>
                   <div style={{ fontSize: 15, color: '#fff', marginBottom: 12 }}>
-                    终端窗口已打开
+                    正在生成二维码...
                   </div>
-                  <div style={{ fontSize: 13, color: '#999', lineHeight: 1.6 }}>
-                    请在 Mac 上找到新打开的终端窗口<br/>
-                    用手机 WhatsApp 扫描终端中的二维码
+                  <div style={{ fontSize: 12, color: '#666' }}>
+                    如果长时间未显示，请查看终端窗口
                   </div>
-                </>
+                </div>
+              )}
+              
+              {whatsappQRCode && (
+                <img src={whatsappQRCode} alt="WhatsApp QR Code" style={{
+                  maxWidth: '100%',
+                  height: 'auto',
+                  display: 'block'
+                }} />
               )}
               
               {whatsappAuthStatus === 'success' && (
-                <>
+                <div>
                   <div style={{ fontSize: 48, marginBottom: 16, color: 'var(--figma-green)' }}>✓</div>
                   <div style={{ fontSize: 15, color: 'var(--figma-green)' }}>
                     认证成功！
                   </div>
-                </>
+                </div>
               )}
               
               {whatsappAuthStatus === 'failed' && (
-                <>
+                <div>
                   <div style={{ fontSize: 48, marginBottom: 16, color: 'var(--figma-red)' }}>✗</div>
                   <div style={{ fontSize: 15, color: 'var(--figma-red)' }}>
                     认证失败，请重试
                   </div>
-                </>
+                </div>
               )}
             </div>
 
-            <div style={{ fontSize: 12, color: '#666', lineHeight: 1.8 }}>
-              <div style={{ marginBottom: 8, fontWeight: 600, color: '#999' }}>扫码步骤：</div>
-              1. 在 Mac 上找到新打开的终端窗口<br/>
-              2. 打开手机 WhatsApp → 设置 → 关联设备<br/>
-              3. 扫描终端窗口中的二维码<br/>
-              4. 扫码成功后此窗口会自动关闭
+            <div style={{ fontSize: 12, color: '#666', lineHeight: 1.8, textAlign: 'center' }}>
+              {whatsappQRCode ? (
+                <>
+                  <div style={{ marginBottom: 8, fontWeight: 600, color: '#999' }}>扫码步骤：</div>
+                  1. 打开手机 WhatsApp<br/>
+                  2. 进入"设置" → "关联设备"<br/>
+                  3. 扫描上方二维码
+                </>
+              ) : (
+                <>
+                  <div style={{ marginBottom: 8, fontWeight: 600, color: '#999' }}>提示：</div>
+                  如果二维码未显示，请在 Mac 上<br/>
+                  找到新打开的终端窗口并扫描
+                </>
+              )}
             </div>
           </div>
         </div>
