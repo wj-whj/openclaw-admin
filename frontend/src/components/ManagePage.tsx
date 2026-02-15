@@ -1005,13 +1005,94 @@ export default function ManagePage() {
                     ))}
                   </select>
                 </Col>
-                <Col span={12}>
-                  <div style={{ fontSize: 11, color: '#ccc', marginBottom: 4 }}>Bot Token / API Key</div>
-                  <Input.Password size="small" placeholder="输入 token..." value={newChannel.botToken}
-                    onChange={e => setNewChannel({ ...newChannel, botToken: e.target.value })}
-                    style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff' }} />
-                </Col>
+                
+                {/* 根据类型显示不同的配置字段 */}
+                {(newChannel.type === 'telegram' || newChannel.type === 'discord') && (
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: '#ccc', marginBottom: 4 }}>Bot Token *</div>
+                    <Input.Password size="small" placeholder="输入 Bot Token..." value={newChannel.botToken}
+                      onChange={e => setNewChannel({ ...newChannel, botToken: e.target.value })}
+                      style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff' }} />
+                  </Col>
+                )}
+                
+                {newChannel.type === 'whatsapp' && (
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: '#ccc', marginBottom: 4 }}>配置方式</div>
+                    <div style={{ fontSize: 11, color: '#999', padding: '8px 0' }}>
+                      使用 wacli 扫码连接（无需 Token）<br/>
+                      或配置 WhatsApp Business API Token
+                    </div>
+                  </Col>
+                )}
+                
+                {newChannel.type === 'signal' && (
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: '#ccc', marginBottom: 4 }}>Phone Number *</div>
+                    <Input size="small" placeholder="+1234567890" value={newChannel.botToken}
+                      onChange={e => setNewChannel({ ...newChannel, botToken: e.target.value })}
+                      style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff' }} />
+                  </Col>
+                )}
+                
+                {newChannel.type === 'slack' && (
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: '#ccc', marginBottom: 4 }}>Bot Token *</div>
+                    <Input.Password size="small" placeholder="xoxb-..." value={newChannel.botToken}
+                      onChange={e => setNewChannel({ ...newChannel, botToken: e.target.value })}
+                      style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff' }} />
+                  </Col>
+                )}
+                
+                {newChannel.type === 'irc' && (
+                  <>
+                    <Col span={6}>
+                      <div style={{ fontSize: 11, color: '#ccc', marginBottom: 4 }}>Server *</div>
+                      <Input size="small" placeholder="irc.libera.chat" value={newChannel.botToken}
+                        onChange={e => setNewChannel({ ...newChannel, botToken: e.target.value })}
+                        style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff' }} />
+                    </Col>
+                    <Col span={6}>
+                      <div style={{ fontSize: 11, color: '#ccc', marginBottom: 4 }}>Port</div>
+                      <Input size="small" type="number" placeholder="6667" defaultValue="6667"
+                        style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff' }} />
+                    </Col>
+                  </>
+                )}
               </Row>
+              
+              {/* IRC 额外字段 */}
+              {newChannel.type === 'irc' && (
+                <Row gutter={[12, 8]} style={{ marginTop: 8 }}>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: '#ccc', marginBottom: 4 }}>Nickname *</div>
+                    <Input size="small" placeholder="openclaw-bot"
+                      style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff' }} />
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: '#ccc', marginBottom: 4 }}>Channels (逗号分隔)</div>
+                    <Input size="small" placeholder="#general, #dev"
+                      style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff' }} />
+                  </Col>
+                </Row>
+              )}
+              
+              {/* Discord 额外字段 */}
+              {newChannel.type === 'discord' && (
+                <Row gutter={[12, 8]} style={{ marginTop: 8 }}>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: '#ccc', marginBottom: 4 }}>Guild ID (可选)</div>
+                    <Input size="small" placeholder="123456789012345678"
+                      style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff' }} />
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: '#ccc', marginBottom: 4 }}>Webhook URL (可选)</div>
+                    <Input size="small" placeholder="https://discord.com/api/webhooks/..."
+                      style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff' }} />
+                  </Col>
+                </Row>
+              )}
+              
               <Row gutter={[12, 8]} style={{ marginTop: 8 }}>
                 <Col span={8}>
                   <div style={{ fontSize: 11, color: '#ccc', marginBottom: 4 }}>DM 策略</div>
@@ -1086,21 +1167,72 @@ export default function ManagePage() {
 
                           <div style={{ marginBottom: 6 }}>
                             <div style={{ color: '#ccc', marginBottom: 2, fontSize: 11 }}>
-                              {channel.type === 'telegram' || channel.type === 'discord' ? 'Bot Token' : 'API Key'} (留空保持不变)
+                              {channel.type === 'telegram' && 'Bot Token (留空保持不变)'}
+                              {channel.type === 'discord' && 'Bot Token (留空保持不变)'}
+                              {channel.type === 'whatsapp' && 'API Token / 使用 wacli 扫码 (留空保持不变)'}
+                              {channel.type === 'signal' && 'Phone Number (留空保持不变)'}
+                              {channel.type === 'slack' && 'Bot Token (留空保持不变)'}
+                              {channel.type === 'irc' && 'Server 地址 (留空保持不变)'}
                             </div>
-                            <Input.Password size="small"
-                              value={channelEditForm.botToken || channelEditForm.token || channelEditForm.apiKey || ''}
-                              onChange={e => {
-                                const val = e.target.value;
-                                if (channel.type === 'telegram' || channel.type === 'discord') {
-                                  setChannelEditForm({ ...channelEditForm, botToken: val });
-                                } else {
-                                  setChannelEditForm({ ...channelEditForm, token: val, apiKey: val });
-                                }
-                              }}
-                              placeholder="留空保持原值"
-                              style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff', fontSize: 11 }} />
+                            {channel.type === 'whatsapp' ? (
+                              <div style={{ fontSize: 10, color: '#999', padding: '6px 0' }}>
+                                💡 提示：WhatsApp 推荐使用 wacli 扫码连接，无需 Token
+                              </div>
+                            ) : (
+                              <Input.Password size="small"
+                                value={channelEditForm.botToken || channelEditForm.token || channelEditForm.apiKey || ''}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  if (channel.type === 'telegram' || channel.type === 'discord') {
+                                    setChannelEditForm({ ...channelEditForm, botToken: val });
+                                  } else {
+                                    setChannelEditForm({ ...channelEditForm, token: val, apiKey: val });
+                                  }
+                                }}
+                                placeholder="留空保持原值"
+                                style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff', fontSize: 11 }} />
+                            )}
                           </div>
+                          
+                          {/* IRC 特殊字段 */}
+                          {channel.type === 'irc' && (
+                            <>
+                              <div style={{ marginBottom: 6 }}>
+                                <div style={{ color: '#ccc', marginBottom: 2, fontSize: 11 }}>Nickname</div>
+                                <Input size="small" value={channelEditForm.nickname || ''}
+                                  onChange={e => setChannelEditForm({ ...channelEditForm, nickname: e.target.value })}
+                                  placeholder="openclaw-bot"
+                                  style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff', fontSize: 11 }} />
+                              </div>
+                              <div style={{ marginBottom: 6 }}>
+                                <div style={{ color: '#ccc', marginBottom: 2, fontSize: 11 }}>Channels (逗号分隔)</div>
+                                <Input size="small" value={channelEditForm.channels || ''}
+                                  onChange={e => setChannelEditForm({ ...channelEditForm, channels: e.target.value })}
+                                  placeholder="#general, #dev"
+                                  style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff', fontSize: 11 }} />
+                              </div>
+                            </>
+                          )}
+                          
+                          {/* Discord 特殊字段 */}
+                          {channel.type === 'discord' && (
+                            <>
+                              <div style={{ marginBottom: 6 }}>
+                                <div style={{ color: '#ccc', marginBottom: 2, fontSize: 11 }}>Guild ID (可选)</div>
+                                <Input size="small" value={channelEditForm.guildId || ''}
+                                  onChange={e => setChannelEditForm({ ...channelEditForm, guildId: e.target.value })}
+                                  placeholder="123456789012345678"
+                                  style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff', fontSize: 11 }} />
+                              </div>
+                              <div style={{ marginBottom: 6 }}>
+                                <div style={{ color: '#ccc', marginBottom: 2, fontSize: 11 }}>Webhook URL (可选)</div>
+                                <Input size="small" value={channelEditForm.webhook || ''}
+                                  onChange={e => setChannelEditForm({ ...channelEditForm, webhook: e.target.value })}
+                                  placeholder="https://discord.com/api/webhooks/..."
+                                  style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)', color: '#fff', fontSize: 11 }} />
+                              </div>
+                            </>
+                          )}
 
                           <Row gutter={4} style={{ marginBottom: 6 }}>
                             <Col span={12}>
