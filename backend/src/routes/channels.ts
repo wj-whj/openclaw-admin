@@ -213,22 +213,29 @@ router.post('/:name/test', async (req, res) => {
 
     const channel = config.channels[name];
 
-    // WhatsApp 用 wacli 认证，不需要 token
+    // WhatsApp 用 openclaw 自身管理认证
     if (name === 'whatsapp') {
       try {
         const { execSync } = require('child_process');
-        const output = execSync('wacli doctor 2>&1', { encoding: 'utf-8', timeout: 5000 });
-        const authenticated = output.includes('AUTHENTICATED  true');
-        const connected = output.includes('CONNECTED      true');
+        const openclawBin = '/Users/wangjian/.nvm/versions/node/v24.0.2/bin/openclaw';
+        const output = execSync(`${openclawBin} status 2>&1`, {
+          encoding: 'utf-8',
+          timeout: 10000,
+          env: { ...process.env, PATH: `/Users/wangjian/.nvm/versions/node/v24.0.2/bin:${process.env.PATH}` }
+        });
+        // 检查 WhatsApp 行的状态
+        const waLine = output.split('\n').find((l: string) => l.includes('WhatsApp'));
+        const isLinked = waLine && !waLine.includes('Not linked') && !waLine.includes('WARN');
+        const isOn = waLine && waLine.includes('ON');
         return res.json({
           ok: true,
-          connected: authenticated,
-          message: authenticated
-            ? (connected ? '已认证且已连接' : '已认证，未连接（需启动 gateway）')
-            : '未认证，请先扫码连接'
+          connected: isLinked && isOn,
+          message: !isOn ? 'WhatsApp 未启用' :
+                   isLinked ? '已连接' :
+                   '未连接，请先扫码认证'
         });
       } catch {
-        return res.json({ ok: true, connected: false, message: '无法检测 wacli 状态' });
+        return res.json({ ok: true, connected: false, message: '无法检测状态' });
       }
     }
 

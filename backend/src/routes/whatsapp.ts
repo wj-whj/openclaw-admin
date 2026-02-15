@@ -8,8 +8,7 @@ let authProcess: any = null;
 let qrCodeImageUrl: string | null = null;
 let authStatus: 'idle' | 'waiting' | 'success' | 'failed' | 'timeout' = 'idle';
 
-// 将 wacli 输出的 Unicode 方块字符二维码解析为像素矩阵
-// █ = 上下都黑, ▀ = 上黑下白, ▄ = 上白下黑, 空格 = 上下都白
+// 将 Unicode 方块字符二维码解析为像素矩阵
 function parseBlockQR(text: string): number[][] {
   const lines = text.split('\n').filter(l => l.includes('█') || l.includes('▄') || l.includes('▀'));
   if (lines.length === 0) return [];
@@ -33,32 +32,29 @@ function parseBlockQR(text: string): number[][] {
   return matrix;
 }
 
-// 将像素矩阵生成 PNG 图片（data URL）
+// 将像素矩阵生成 PNG 图片
 async function matrixToPng(matrix: number[][], scale: number = 6): Promise<string> {
   const height = matrix.length;
   const width = matrix.reduce((max, row) => Math.max(max, row.length), 0);
   
-  // 添加白色边距
   const margin = 4;
   const imgW = (width + margin * 2) * scale;
   const imgH = (height + margin * 2) * scale;
   
-  // 创建 RGBA 像素数据
-  const pixels = Buffer.alloc(imgW * imgH * 4, 255); // 全白
+  const pixels = Buffer.alloc(imgW * imgH * 4, 255);
   
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < (matrix[y]?.length || 0); x++) {
       if (matrix[y][x] === 1) {
-        // 黑色像素，按 scale 放大
         for (let sy = 0; sy < scale; sy++) {
           for (let sx = 0; sx < scale; sx++) {
             const px = (x + margin) * scale + sx;
             const py = (y + margin) * scale + sy;
             const idx = (py * imgW + px) * 4;
-            pixels[idx] = 0;     // R
-            pixels[idx + 1] = 0; // G
-            pixels[idx + 2] = 0; // B
-            pixels[idx + 3] = 255; // A
+            pixels[idx] = 0;
+            pixels[idx + 1] = 0;
+            pixels[idx + 2] = 0;
+            pixels[idx + 3] = 255;
           }
         }
       }
@@ -72,7 +68,7 @@ async function matrixToPng(matrix: number[][], scale: number = 6): Promise<strin
   return `data:image/png;base64,${png.toString('base64')}`;
 }
 
-// 启动 wacli 认证并捕获二维码
+// 启动 OpenClaw WhatsApp 认证（使用 openclaw channels login）
 router.post('/auth/start', async (req, res) => {
   try {
     if (authProcess) {
@@ -86,34 +82,41 @@ router.post('/auth/start', async (req, res) => {
     let allOutput = '';
     let qrGenerated = false;
 
-    authProcess = spawn('wacli', ['auth'], { env: { ...process.env } });
+    // 清除旧的认证数据，确保重新扫码
+    const { execSync } = require('child_process');
+    try {
+      execSync('rm -rf ~/.openclaw/credentials/whatsapp/default', { encoding: 'utf-8' });
+    } catch {}
+
+    // 使用 openclaw channels login，这样认证数据存到 OpenClaw 的 credentials 目录
+    const openclawBin = '/Users/wangjian/.nvm/versions/node/v24.0.2/bin/openclaw';
+    authProcess = spawn(openclawBin, ['channels', 'login', '--channel', 'whatsapp'], {
+      env: { ...process.env, PATH: `/Users/wangjian/.nvm/versions/node/v24.0.2/bin:${process.env.PATH}` }
+    });
 
     const handleOutput = async (data: Buffer) => {
       const text = data.toString();
       allOutput += text;
 
-      // 检测认证成功
-      if (text.includes('Authenticated') || text.includes('successfully') || text.includes('logged in')) {
+      if (text.includes('Connected!') || text.includes('successfully linked') || text.includes('logged in!')) {
         authStatus = 'success';
         if (authProcess) { authProcess.kill(); authProcess = null; }
         return;
       }
 
-      // 检测超时
       if (text.includes('timed out') || text.includes('timeout')) {
         authStatus = 'timeout';
         if (authProcess) { authProcess.kill(); authProcess = null; }
         return;
       }
 
-      // 尝试解析二维码
       if (!qrGenerated && (text.includes('█') || text.includes('▄') || text.includes('▀'))) {
         const matrix = parseBlockQR(allOutput);
         if (matrix.length > 20) {
           try {
             qrCodeImageUrl = await matrixToPng(matrix);
             qrGenerated = true;
-            console.log('QR code image generated from wacli output');
+            console.log('QR code image generated from openclaw channels login output');
           } catch (err) {
             console.error('Failed to generate QR image:', err);
           }
@@ -126,18 +129,7 @@ router.post('/auth/start', async (req, res) => {
 
     authProcess.on('close', (code: number) => {
       if (authStatus === 'waiting') {
-        // 进程结束后再检查一次 wacli doctor
-        try {
-          const { execSync } = require('child_process');
-          const doc = execSync('wacli doctor 2>&1', { encoding: 'utf-8', timeout: 5000 });
-          if (doc.includes('AUTHENTICATED  true')) {
-            authStatus = 'success';
-          } else {
-            authStatus = code === 0 ? 'success' : 'failed';
-          }
-        } catch {
-          authStatus = code === 0 ? 'success' : 'failed';
-        }
+        authStatus = code === 0 ? 'success' : 'failed';
       }
       authProcess = null;
     });
@@ -159,7 +151,7 @@ router.post('/auth/start', async (req, res) => {
   }
 });
 
-// 获取认证状态（轮询用）
+// 获取认证状态
 router.get('/auth/status', (req, res) => {
   res.json({
     status: authStatus,
