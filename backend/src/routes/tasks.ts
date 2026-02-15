@@ -117,7 +117,26 @@ router.post('/cron', async (req, res) => {
       args.push('--announce');
       if (deliveryChannel && deliveryChannel !== 'auto') {
         args.push('--channel', deliveryChannel);
-        if (deliveryTo) args.push('--to', JSON.stringify(deliveryTo));
+        // 自动查找渠道的 delivery target
+        if (deliveryTo) {
+          args.push('--to', JSON.stringify(deliveryTo));
+        } else {
+          // 从 sessions.json 中查找最近的 target
+          const sessionsPath = path.join(os.homedir(), '.openclaw', 'agents', 'main', 'sessions', 'sessions.json');
+          if (await fs.pathExists(sessionsPath)) {
+            try {
+              const sessions = await fs.readJSON(sessionsPath);
+              for (const [, meta] of Object.entries(sessions) as [string, any][]) {
+                const lastTo = meta?.lastTo || meta?.route?.to || '';
+                if (lastTo.startsWith(`${deliveryChannel}:`)) {
+                  const toTarget = lastTo.replace(`${deliveryChannel}:`, '');
+                  args.push('--to', JSON.stringify(toTarget));
+                  break;
+                }
+              }
+            } catch {}
+          }
+        }
       }
     }
 
