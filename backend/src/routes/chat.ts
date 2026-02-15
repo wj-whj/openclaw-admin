@@ -11,7 +11,20 @@ const execAsync = promisify(exec);
 const OPENCLAW = path.join(os.homedir(), '.nvm/versions/node/v24.0.2/bin/openclaw');
 const ENV = { ...process.env, PATH: `${os.homedir()}/.nvm/versions/node/v24.0.2/bin:${process.env.PATH}` };
 
-const ADMIN_SESSION_ID = 'admin-chat-session';
+// 动态获取主会话 ID（和 TUI/Telegram/WhatsApp 共享）
+async function getMainSessionId(): Promise<string> {
+  const sessionsPath = path.join(os.homedir(), '.openclaw', 'agents', 'main', 'sessions', 'sessions.json');
+  try {
+    const data = await fs.readJSON(sessionsPath);
+    const main = data['agent:main:main'];
+    if (main?.sessionId) return main.sessionId;
+  } catch (err) {
+    console.error('[Chat] Failed to read main session ID:', err);
+  }
+  // Fallback: 使用独立会话
+  return 'admin-chat-session';
+}
+
 const UPLOAD_DIR = path.join(os.homedir(), '.openclaw', 'admin-uploads');
 const OUTPUT_DIR = path.join(os.homedir(), '.openclaw', 'admin-outputs');
 
@@ -85,9 +98,10 @@ router.post('/', upload.array('files', 5), async (req: any, res) => {
     // 转义消息
     const escaped = fullMessage.replace(/'/g, "'\\''");
 
-    // 使用独立会话（避免与主会话冲突导致排队超时）
+    // 使用主会话（和 TUI/Telegram/WhatsApp 共享同一会话上下文）
+    const sessionId = await getMainSessionId();
     const { stdout } = await execAsync(
-      `${OPENCLAW} agent --session-id ${ADMIN_SESSION_ID} --message '${escaped}' --json`,
+      `${OPENCLAW} agent --session-id ${sessionId} --message '${escaped}' --json`,
       { timeout: 120000, env: ENV, maxBuffer: 2 * 1024 * 1024 }
     );
 
