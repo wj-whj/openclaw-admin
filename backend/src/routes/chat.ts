@@ -219,6 +219,181 @@ function getMimeType(filePath: string): string {
   return map[ext] || 'application/octet-stream';
 }
 
+// POST /api/chat/translate - 翻译文本（支持快速翻译和详细释义）
+router.post('/translate', async (req, res) => {
+  try {
+    const { text, mode = 'quick', targetLang = 'auto' } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: '请提供要翻译的文本' });
+    }
+
+    // 目标语言映射
+    const langMap: Record<string, string> = {
+      'zh': 'Chinese',
+      'en': 'English',
+      'ja': 'Japanese',
+    };
+
+    let prompt: string;
+    if (mode === 'detail') {
+      const target = targetLang !== 'auto' && langMap[targetLang]
+        ? `Translate to ${langMap[targetLang]}.`
+        : 'If it\'s Chinese, translate to English. If it\'s English or Japanese, translate to Chinese.';
+      prompt = `${target} Then provide: 1) Translation, 2) Usage notes and context, 3) 2-3 example sentences. Format with clear sections.\n\nText: ${text.trim()}`;
+    } else {
+      const target = targetLang !== 'auto' && langMap[targetLang]
+        ? `Translate the following text to ${langMap[targetLang]}. Only return the translation, nothing else.`
+        : 'Translate the following text. If it\'s Chinese, translate to English. If it\'s English, translate to Chinese. If it\'s Japanese, translate to Chinese. Only return the translation, nothing else.';
+      prompt = `${target}\n\n${text.trim()}`;
+    }
+
+    const escaped = prompt.replace(/'/g, "'\\''");
+    const { stdout } = await execAsync(
+      `${OPENCLAW} agent --agent main --message '${escaped}' --json`,
+      { timeout: 30000, env: ENV, maxBuffer: 1 * 1024 * 1024 }
+    );
+
+    let translated = '';
+    try {
+      const parsed = JSON.parse(stdout.trim());
+      if (parsed.result?.payloads?.length > 0) {
+        translated = parsed.result.payloads.map((p: any) => p.text).filter(Boolean).join('');
+      } else {
+        translated = parsed.reply || parsed.text || '';
+      }
+    } catch {
+      const lines = stdout.trim().split('\n');
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.result?.payloads?.length > 0) {
+            translated = parsed.result.payloads.map((p: any) => p.text).filter(Boolean).join('');
+            break;
+          }
+        } catch { /* skip */ }
+      }
+      if (!translated) translated = stdout.trim();
+    }
+
+    res.json({ translated: translated.trim() });
+  } catch (error: any) {
+    console.error('[Translate] Error:', error.message);
+    if (error.killed) return res.status(504).json({ error: '翻译超时' });
+    res.status(500).json({ error: '翻译失败', details: error.message });
+  }
+});
+
+// POST /api/chat/generate-ppt - 生成 PPT 文件
+router.post('/generate-ppt', async (req, res) => {
+  try {
+    const { topic, style = 'tech', pages = 8 } = req.body;
+    if (!topic || !topic.trim()) {
+      return res.status(400).json({ error: '请提供 PPT 主题' });
+    }
+
+    const styleNames: Record<string, string> = {
+      tech: '科技风（深色背景，蓝紫配色）',
+      business: '商务风（白色背景，深蓝配色）',
+      minimal: '极简风（浅灰背景，黑白配色）',
+    };
+
+    const prompt = `Generate a ${pages}-slide PowerPoint presentation about: "${topic.trim()}"
+Style: ${styleNames[style] || style}
+
+Return ONLY a valid JSON object with this exact structure (no markdown, no explanation):
+{
+  "style": "${style}",
+  "slides": [
+    {
+      "page": 0,
+      "title": "Main Title",
+      "subtitle": "Subtitle or tagline"
+    },
+    {
+      "page": 2,
+      "title": "Slide Title",
+      "points": ["Point 1", "Point 2", "Point 3"],
+      "notes": "Speaker notes"
+    }
+  ]
+}
+
+Rules:
+- First slide is cover (has title + subtitle, no points)
+- Remaining ${pages - 1} slides are content slides (title + 3-5 points each)
+- All text in Chinese
+- Points should be concise (under 30 characters each)
+- Return ONLY the JSON, nothing else`;
+
+    const escaped = prompt.replace(/'/g, "'\\''");
+    const { stdout } = await execAsync(
+      `${OPENCLAW} agent --agent main --message '${escaped}' --json`,
+      { timeout: 60000, env: ENV, maxBuffer: 2 * 1024 * 1024 }
+    );
+
+    // 解析 AI 回复
+    let aiReply = '';
+    try {
+      const parsed = JSON.parse(stdout.trim());
+      if (parsed.result?.payloads?.length > 0) {
+        aiReply = parsed.result.payloads.map((p: any) => p.text).filter(Boolean).join('');
+      } else {
+        aiReply = parsed.reply || parsed.text || '';
+      }
+    } catch {
+      const lines = stdout.trim().split('\n');
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.result?.payloads?.length > 0) {
+            aiReply = parsed.result.payloads.map((p: any) => p.text).filter(Boolean).join('');
+            break;
+          }
+        } catch { /* skip */ }
+      }
+      if (!aiReply) aiReply = stdout.trim();
+    }
+
+    // 提取 JSON
+    const jsonMatch = aiReply.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return res.status(500).json({ error: 'AI 未返回有效的 PPT 内容' });
+    }
+    const pptData = JSON.parse(jsonMatch[0]);
+
+    // 写入临时 JSON 文件
+    const timestamp = Date.now();
+    const jsonPath = path.join(os.tmpdir(), `ppt-${timestamp}.json`);
+    const pptxPath = path.join(OUTPUT_DIR, `ppt-${timestamp}.pptx`);
+    await fs.writeJSON(jsonPath, pptData);
+
+    // 调用 python 脚本生成 pptx
+    const scriptPath = path.join(__dirname, '../../scripts/generate_pptx.py');
+    await execAsync(`python3 "${scriptPath}" "${jsonPath}" "${pptxPath}"`, {
+      timeout: 30000, env: ENV
+    });
+
+    // 清理临时 JSON
+    await fs.remove(jsonPath).catch(() => {});
+
+    // 返回文件下载链接
+    const filename = `${topic.trim().slice(0, 20).replace(/[^\w\u4e00-\u9fa5]/g, '_')}.pptx`;
+    res.json({
+      success: true,
+      file: {
+        name: filename,
+        path: pptxPath,
+        size: (await fs.stat(pptxPath)).size,
+        type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      }
+    });
+  } catch (error: any) {
+    console.error('[PPT] Error:', error.message);
+    if (error.killed) return res.status(504).json({ error: 'PPT 生成超时' });
+    res.status(500).json({ error: 'PPT 生成失败', details: error.message });
+  }
+});
+
 export default router;
 
 // GET /api/chat/history - 获取主会话最近的消息历史

@@ -28,7 +28,15 @@ router.get('/', async (req, res) => {
       }))
     }));
 
-    res.json({ providers: result, defaultModel });
+    // 构建每个 agent 的实际模型配置
+    const agentsList = config.agents?.list || [];
+    const agentModels = agentsList.map((agent: any) => ({
+      id: agent.id,
+      model: agent.model || defaultModel,
+      workspace: agent.workspace || config.agents?.defaults?.workspace || ''
+    }));
+
+    res.json({ providers: result, defaultModel, agentModels });
   } catch (error) {
     console.error('Failed to get providers:', error);
     res.status(500).json({ error: 'Failed to get providers' });

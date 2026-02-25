@@ -102,3 +102,23 @@ button:focus-visible {
 *::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* Light theme 滚动条 */
+[data-theme="light"] * {
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+[data-theme="light"] *::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  background-clip: padding-box;
+}
+
+[data-theme="light"] *::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
+  background-clip: padding-box;
+}
+
+[data-theme="light"] *::-webkit-scrollbar-thumb:active {
+  background: rgba(0, 0, 0, 0.5);
+  background-clip: padding-box;
+}

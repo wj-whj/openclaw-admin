@@ -6,11 +6,15 @@ import Sidebar from './components/Sidebar';
 import MonitorPage from './components/MonitorPage';
 import ManagePage from './components/ManagePage';
 import ChatPage from './components/ChatPage';
+import TeamPage from './components/TeamPage';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState('monitor');
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
+  });
 
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
@@ -19,6 +23,17 @@ function App() {
     }
     setLoading(false);
   }, []);
+
+  useEffect(() => {
+    if (theme === 'light') {
+      document.documentElement.dataset.theme = 'light';
+    } else {
+      delete document.documentElement.dataset.theme;
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
 
   const handleLogin = (token: string) => {
     setIsAuthenticated(true);
@@ -33,6 +48,8 @@ function App() {
     switch (currentPage) {
       case 'monitor':
         return <MonitorPage />;
+      case 'team':
+        return <TeamPage />;
       case 'manage':
         return <ManagePage />;
       case 'chat':
@@ -44,6 +61,7 @@ function App() {
 
   const pageTitle = {
     monitor: '监控中心',
+    team: '团队状态',
     manage: '管理中心',
     chat: '对话中心'
   }[currentPage];
@@ -55,7 +73,7 @@ function App() {
         justifyContent: 'center', 
         alignItems: 'center', 
         height: '100vh',
-        background: '#0d0d0d',
+        background: 'var(--bg-primary)',
         fontSize: 12,
         color: 'var(--text-secondary)'
       }}>
@@ -73,13 +91,15 @@ function App() {
       display: 'flex',
       width: '100vw',
       height: '100vh',
-      background: '#0d0d0d',
+      background: 'var(--bg-primary)',
       overflow: 'hidden'
     }}>
       {/* Sidebar */}
       <Sidebar 
         currentPage={currentPage} 
         onPageChange={setCurrentPage}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       {/* Main Content */}

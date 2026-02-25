@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { PaperClipOutlined, SendOutlined, DeleteOutlined, FileOutlined, DownloadOutlined, PictureOutlined } from '@ant-design/icons';
+import { PaperClipOutlined, SendOutlined, DeleteOutlined, FileOutlined, DownloadOutlined, PictureOutlined, GlobalOutlined, FilePptOutlined } from '@ant-design/icons';
+import TranslatePanel from './TranslatePanel';
+import PptPanel from './PptPanel';
 
 // 动态 API 地址，和 api.ts 保持一致
 const getApiBase = () => {
@@ -34,6 +36,8 @@ export default function ChatPage() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [lastSync, setLastSync] = useState(0);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [showTranslate, setShowTranslate] = useState(false);
+  const [showPpt, setShowPpt] = useState(false);
   const prevMessageCountRef = useRef(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -189,11 +193,11 @@ export default function ChatPage() {
           padding: '4px 10px', borderRadius: 'var(--radius-sm)',
           background: isOutput ? 'rgba(27, 196, 125, 0.15)' : 'rgba(78, 143, 240, 0.15)',
           border: `1px solid ${isOutput ? 'rgba(27, 196, 125, 0.3)' : 'rgba(78, 143, 240, 0.3)'}`,
-          fontSize: 11, color: '#ccc', maxWidth: 280
+          fontSize: 11, color: 'var(--text-secondary)', maxWidth: 280
         }}>
-          {isImage(f.type) ? <PictureOutlined style={{ color: '#4e8ff0' }} /> : <FileOutlined style={{ color: '#999' }} />}
+          {isImage(f.type) ? <PictureOutlined style={{ color: '#4e8ff0' }} /> : <FileOutlined style={{ color: 'var(--text-tertiary)' }} />}
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{f.name}</span>
-          <span style={{ color: '#666', flexShrink: 0 }}>{formatSize(f.size)}</span>
+          <span style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}>{formatSize(f.size)}</span>
           {isOutput && f.path && (
             <a href={getFileUrl(f.path)} target="_blank" rel="noreferrer"
               style={{ color: 'var(--figma-blue)', flexShrink: 0 }}>
@@ -239,7 +243,7 @@ export default function ChatPage() {
               boxShadow: '0 0 6px rgba(27, 196, 125, 0.5)'
             }} />
             {lastSync > 0 && (
-              <span style={{ fontSize: 10, color: '#666', marginLeft: 4 }}>
+              <span style={{ fontSize: 10, color: 'var(--text-tertiary)', marginLeft: 4 }}>
                 已同步 {Math.floor((Date.now() - lastSync) / 1000)}s 前
               </span>
             )}
@@ -259,8 +263,8 @@ export default function ChatPage() {
           {messages.length === 0 ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
               <span style={{ fontSize: 48 }}>🦞</span>
-              <div style={{ color: '#999', fontSize: 14 }}>开始与 OpenClaw 对话</div>
-              <div style={{ color: '#666', fontSize: 12 }}>支持文字、图片、文档等多种格式输入输出</div>
+              <div style={{ color: 'var(--text-tertiary)', fontSize: 14 }}>开始与 OpenClaw 对话</div>
+              <div style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>支持文字、图片、文档等多种格式输入输出</div>
             </div>
           ) : (
             messages.map(msg => (
@@ -269,7 +273,7 @@ export default function ChatPage() {
                   maxWidth: '75%', padding: 'var(--space-3)',
                   borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
                   background: msg.role === 'user' ? 'var(--figma-blue)' : 'var(--bg-tertiary)',
-                  color: msg.role === 'user' ? '#ffffff' : '#e5e5e5',
+                  color: msg.role === 'user' ? '#ffffff' : 'var(--text-primary)',
                   border: msg.role === 'assistant' ? '1px solid var(--border-subtle)' : 'none'
                 }}>
                   {msg.content && (
@@ -301,7 +305,7 @@ export default function ChatPage() {
                 background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)',
                 display: 'flex', alignItems: 'center', gap: 6
               }}>
-                <span style={{ fontSize: 12, color: '#999' }}>🤖 思考中</span>
+                <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>🤖 思考中</span>
                 <span style={{ display: 'inline-flex', gap: 3 }}>
                   {[0, 1, 2].map(i => (
                     <span key={i} style={{
@@ -318,7 +322,7 @@ export default function ChatPage() {
 
         {/* 回到底部按钮 */}
         {!autoScroll && (
-          <div style={{ position: 'absolute', bottom: 100, right: 30, zIndex: 10 }}>
+          <div style={{ position: 'absolute', bottom: showTranslate ? 380 : 100, right: 30, zIndex: 10, transition: 'bottom 0.2s ease' }}>
             <button
               onClick={() => {
                 setAutoScroll(true);
@@ -330,7 +334,7 @@ export default function ChatPage() {
                 borderRadius: '50%',
                 width: 40,
                 height: 40,
-                color: '#fff',
+                color: 'var(--text-primary)',
                 cursor: 'pointer',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
                 fontSize: 18,
@@ -370,13 +374,13 @@ export default function ChatPage() {
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '3px 8px', borderRadius: 'var(--radius-sm)',
                 background: 'rgba(78, 143, 240, 0.1)', border: '1px solid rgba(78, 143, 240, 0.2)',
-                fontSize: 11, color: '#ccc'
+                fontSize: 11, color: 'var(--text-secondary)'
               }}>
                 <FileOutlined style={{ fontSize: 12, color: '#4e8ff0' }} />
                 <span style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                <span style={{ color: '#666' }}>{formatSize(f.size)}</span>
+                <span style={{ color: 'var(--text-tertiary)' }}>{formatSize(f.size)}</span>
                 <button onClick={() => removePendingFile(i)}
-                  style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer', padding: 0, lineHeight: 1 }}>
+                  style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0, lineHeight: 1 }}>
                   <DeleteOutlined style={{ fontSize: 10 }} />
                 </button>
               </div>
@@ -392,6 +396,17 @@ export default function ChatPage() {
           boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
           flexShrink: 0
         }}>
+          {/* 翻译面板 */}
+          {showTranslate && (
+            <TranslatePanel
+              onClose={() => setShowTranslate(false)}
+              onInsert={(text) => { setInput(text); setShowTranslate(false); }}
+            />
+          )}
+          {/* PPT 面板 */}
+          {showPpt && (
+            <PptPanel onClose={() => setShowPpt(false)} />
+          )}
           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-end' }}>
             <input type="file" ref={fileInputRef} multiple onChange={handleFileSelect}
               accept="image/*,.pdf,.csv,.xlsx,.json,.txt,.md,.html,.py,.js,.ts,.zip,.docx"
@@ -399,11 +414,31 @@ export default function ChatPage() {
             <button onClick={() => fileInputRef.current?.click()} disabled={loading}
               style={{
                 background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)',
-                color: pendingFiles.length > 0 ? 'var(--figma-blue)' : '#999', cursor: 'pointer',
+                color: pendingFiles.length > 0 ? 'var(--figma-blue)' : 'var(--text-tertiary)', cursor: 'pointer',
                 padding: '8px 10px', transition: 'all 0.2s', flexShrink: 0
               }}
               title="上传文件">
               <PaperClipOutlined style={{ fontSize: 16 }} />
+            </button>
+            <button onClick={() => setShowTranslate(v => !v)}
+              style={{
+                background: showTranslate ? 'var(--figma-blue)' : 'none',
+                border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)',
+                color: showTranslate ? '#fff' : 'var(--text-tertiary)',
+                cursor: 'pointer', padding: '8px 10px', transition: 'all 0.2s', flexShrink: 0
+              }}
+              title="翻译">
+              <GlobalOutlined style={{ fontSize: 16 }} />
+            </button>
+            <button onClick={() => setShowPpt(v => !v)}
+              style={{
+                background: showPpt ? 'var(--figma-purple)' : 'none',
+                border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)',
+                color: showPpt ? '#fff' : 'var(--text-tertiary)',
+                cursor: 'pointer', padding: '8px 10px', transition: 'all 0.2s', flexShrink: 0
+              }}
+              title="生成 PPT">
+              <FilePptOutlined style={{ fontSize: 16 }} />
             </button>
             <textarea
               value={input} onChange={(e) => setInput(e.target.value)}
@@ -413,7 +448,7 @@ export default function ChatPage() {
               style={{
                 flex: 1, padding: '8px 12px', background: 'var(--bg-primary)',
                 border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)',
-                color: '#ffffff', fontSize: 13, fontFamily: 'inherit',
+                color: 'var(--text-primary)', fontSize: 13, fontFamily: 'inherit',
                 resize: 'none', minHeight: 44, maxHeight: 200, lineHeight: 1.5,
                 outline: 'none'
               }}
@@ -423,7 +458,7 @@ export default function ChatPage() {
               style={{
                 background: loading ? 'var(--bg-tertiary)' : 'var(--figma-blue)',
                 border: 'none', borderRadius: 'var(--radius-sm)',
-                color: '#fff', cursor: loading ? 'not-allowed' : 'pointer',
+                color: 'var(--text-primary)', cursor: loading ? 'not-allowed' : 'pointer',
                 padding: '8px 16px', fontSize: 13, fontWeight: 500,
                 transition: 'all 0.2s', flexShrink: 0, minWidth: 70
               }}>

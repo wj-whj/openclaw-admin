@@ -45,6 +45,8 @@ export const getSessionMessages = (sessionId: string, params?: { limit?: number;
   api.get(`/sessions/${sessionId}/messages`, { params });
 export const deleteSession = (sessionKey: string) => api.delete(`/sessions/${encodeURIComponent(sessionKey)}`);
 export const getModels = () => api.get('/models');
+export const updateModels = (data: any) => api.put('/models', data);
+export const testProvider = (provider: string) => api.post('/models/test', { provider });
 export const getSkills = () => api.get('/skills');
 export const getLogs = () => api.get('/logs');
 
@@ -75,3 +77,6 @@ export const cancelWhatsAppAuth = () => api.post('/whatsapp/auth/cancel');
 
 // Chat
 export const sendChatMessage = (message: string) => api.post('/chat', { message });
+
+// System
+export const restartGateway = () => api.post('/system/restart');

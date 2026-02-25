@@ -37,6 +37,30 @@
   --radius-lg: 12px;
 }
 
+/* Light Theme */
+[data-theme="light"] {
+  --bg-primary: #f7f8fa;
+  --bg-secondary: rgba(255, 255, 255, 0.85);
+  --bg-tertiary: rgba(0, 0, 0, 0.04);
+  --bg-hover: rgba(0, 0, 0, 0.06);
+
+  --text-primary: #111111;
+  --text-secondary: #3d3d3d;
+  --text-tertiary: #666666;
+
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-default: rgba(0, 0, 0, 0.15);
+  --border-strong: rgba(0, 0, 0, 0.25);
+
+  --figma-purple: #7c3aed;
+  --figma-purple-light: rgba(124, 58, 237, 0.08);
+  --figma-blue: #0d8de3;
+  --figma-green: #16a869;
+  --figma-red: #d93b1f;
+  --figma-yellow: #b8860b;
+  --figma-orange: #e05a4a;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -504,4 +528,73 @@ body {
 
 .figma-panel:hover {
   border-color: var(--border-default);
+}
+
+/* Light theme - clean & transparent (通透无蒙层) */
+[data-theme="light"] .figma-card,
+[data-theme="light"] .figma-panel {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 4px 12px rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .figma-card:hover {
+  background: #ffffff;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .figma-panel-header {
+  background: rgba(0, 0, 0, 0.015);
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .figma-sidebar {
+  background: #ffffff;
+  border-right-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .figma-sidebar-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="light"] .figma-sidebar-item.active {
+  background: rgba(13, 141, 227, 0.06);
+}
+
+[data-theme="light"] .figma-toolbar {
+  background: #ffffff;
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .figma-stat {
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .figma-badge-gray {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-tertiary);
+}
+
+[data-theme="light"] .figma-btn {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .figma-btn:hover {
+  background: #fafafa;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .figma-btn-ghost {
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-theme="light"] .figma-input {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
 }

@@ -2,19 +2,29 @@ import {
   DashboardOutlined,
   SettingOutlined,
   MessageOutlined,
+  TeamOutlined,
+  SunOutlined,
+  MoonOutlined,
 } from '@ant-design/icons';
 
 interface SidebarProps {
   currentPage: string;
   onPageChange: (page: string) => void;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
 }
 
-export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
+export default function Sidebar({ currentPage, onPageChange, theme, onToggleTheme }: SidebarProps) {
   const menuItems = [
     {
       key: 'monitor',
       icon: <DashboardOutlined />,
       label: '监控中心',
+    },
+    {
+      key: 'team',
+      icon: <TeamOutlined />,
+      label: '团队状态',
     },
     {
       key: 'manage',
@@ -29,7 +39,7 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
   ];
 
   return (
-    <div className="figma-sidebar">
+    <div className="figma-sidebar" style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <div className="figma-sidebar-header">
         <div style={{
@@ -63,7 +73,7 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <div className="figma-sidebar-nav">
+      <div className="figma-sidebar-nav" style={{ flex: 1 }}>
         {menuItems.map(item => (
           <div
             key={item.key}
@@ -75,6 +85,21 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
           </div>
         ))}
       </div>
+
+      {/* Theme Toggle */}
+      <div style={{ padding: 'var(--space-3) var(--space-4)', borderTop: '1px solid var(--border-subtle)' }}>
+        <div
+          className="figma-sidebar-item"
+          onClick={onToggleTheme}
+          style={{ marginBottom: 0 }}
+        >
+          <span className="figma-sidebar-item-icon">
+            {theme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+          </span>
+          <span>{theme === 'dark' ? '切换白天' : '切换黑夜'}</span>
+        </div>
+      </div>
     </div>
   );
 }
+

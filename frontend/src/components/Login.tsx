@@ -29,7 +29,7 @@ export default function Login({ onLogin }: LoginProps) {
       justifyContent: 'center',
       alignItems: 'center',
       minHeight: '100vh',
-      background: '#0d0d0d',
+      background: 'var(--bg-primary)',
       padding: '20px'
     }}>
       <div className="figma-card fade-in-up glow-purple" style={{ 

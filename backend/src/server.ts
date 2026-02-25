@@ -12,6 +12,8 @@ import tasksRouter from './routes/tasks';
 import channelsRouter from './routes/channels';
 import whatsappRouter from './routes/whatsapp';
 import chatRouter from './routes/chat';
+import teamRouter from './routes/team';
+import systemRouter from './routes/system';
 
 const app = express();
 const httpServer = createServer(app);
@@ -62,6 +64,8 @@ app.use('/api/tasks', tasksRouter);
 app.use('/api/channels', channelsRouter);
 app.use('/api/whatsapp', whatsappRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/team', teamRouter);
+app.use('/api/system', systemRouter);
 
 // WebSocket
 io.on('connection', (socket) => {

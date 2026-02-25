@@ -143,22 +143,31 @@ async function getGatewayStatus() {
 
 async function getSessionsInfo() {
   try {
-    const sessionsDir = `${os.homedir()}/.openclaw/agents/main/sessions`;
-    const sessionsJsonPath = `${sessionsDir}/sessions.json`;
-    const sessionsData = await fs.pathExists(sessionsJsonPath) ? await fs.readJSON(sessionsJsonPath) : {};
-    const knownIds = new Set(Object.values(sessionsData).map((m: any) => m.sessionId));
-
+    const agentsDir = `${os.homedir()}/.openclaw/agents`;
     const now = Date.now();
     const activeThreshold = 30 * 60 * 1000;
-    let total = Object.keys(sessionsData).length;
+    let total = 0;
     let activeCount = 0;
     let subagentCount = 0;
 
-    for (const [key, meta] of Object.entries(sessionsData) as [string, any][]) {
-      if (meta.updatedAt && (now - meta.updatedAt < activeThreshold)) activeCount++;
+    if (!await fs.pathExists(agentsDir)) {
+      return { total: 0, active: 0, subagents: 0 };
     }
 
-    if (await fs.pathExists(sessionsDir)) {
+    const agents = await fs.readdir(agentsDir);
+    for (const agent of agents) {
+      const sessionsDir = `${agentsDir}/${agent}/sessions`;
+      if (!await fs.pathExists(sessionsDir)) continue;
+
+      const sessionsJsonPath = `${sessionsDir}/sessions.json`;
+      const sessionsData = await fs.pathExists(sessionsJsonPath) ? await fs.readJSON(sessionsJsonPath) : {};
+      const knownIds = new Set(Object.values(sessionsData).map((m: any) => m.sessionId));
+
+      total += Object.keys(sessionsData).length;
+      for (const [, meta] of Object.entries(sessionsData) as [string, any][]) {
+        if (meta.updatedAt && (now - meta.updatedAt < activeThreshold)) activeCount++;
+      }
+
       const files = await fs.readdir(sessionsDir);
       for (const file of files) {
         if (!file.endsWith('.jsonl') || file.includes('.deleted') || file.includes('.lock')) continue;
@@ -177,13 +186,10 @@ async function getSessionsInfo() {
 
 async function getUsageInfo() {
   try {
-    const sessionsDir = `${os.homedir()}/.openclaw/agents/main/sessions`;
-    if (!await fs.pathExists(sessionsDir)) {
+    const agentsDir = `${os.homedir()}/.openclaw/agents`;
+    if (!await fs.pathExists(agentsDir)) {
       return { tokensToday: 0, requestsToday: 0, modelStats: [] };
     }
-
-    const files = await fs.readdir(sessionsDir);
-    const jsonlFiles = files.filter(f => f.endsWith('.jsonl'));
 
     let tokensToday = 0;
     let requestsToday = 0;
@@ -193,30 +199,38 @@ async function getUsageInfo() {
     today.setHours(0, 0, 0, 0);
     const todayTimestamp = today.getTime();
 
-    for (const file of jsonlFiles) {
-      try {
-        const content = await fs.readFile(`${sessionsDir}/${file}`, 'utf-8');
-        const lines = content.trim().split('\n').filter(l => l.length > 0);
+    const agents = await fs.readdir(agentsDir);
+    for (const agent of agents) {
+      const sessionsDir = `${agentsDir}/${agent}/sessions`;
+      if (!await fs.pathExists(sessionsDir)) continue;
 
-        for (const line of lines) {
-          try {
-            const entry = JSON.parse(line);
-            const timestamp = new Date(entry.timestamp).getTime();
-            if (timestamp < todayTimestamp) continue;
+      const files = await fs.readdir(sessionsDir);
+      const jsonlFiles = files.filter(f => f.endsWith('.jsonl'));
 
-            if (entry.message?.usage?.totalTokens) {
-              const tokens = entry.message.usage.totalTokens;
-              const model = entry.message?.model || 'unknown';
-              tokensToday += tokens;
-              requestsToday++;
-              modelTokens[model] = (modelTokens[model] || 0) + tokens;
-            }
-          } catch {}
-        }
-      } catch {}
+      for (const file of jsonlFiles) {
+        try {
+          const content = await fs.readFile(`${sessionsDir}/${file}`, 'utf-8');
+          const lines = content.trim().split('\n').filter(l => l.length > 0);
+
+          for (const line of lines) {
+            try {
+              const entry = JSON.parse(line);
+              const timestamp = new Date(entry.timestamp).getTime();
+              if (timestamp < todayTimestamp) continue;
+
+              if (entry.message?.usage?.totalTokens) {
+                const tokens = entry.message.usage.totalTokens;
+                const model = entry.message?.model || 'unknown';
+                tokensToday += tokens;
+                requestsToday++;
+                modelTokens[model] = (modelTokens[model] || 0) + tokens;
+              }
+            } catch {}
+          }
+        } catch {}
+      }
     }
 
-    // 转换为数组并排序
     const modelStats = Object.entries(modelTokens)
       .map(([model, tokens]) => ({ model, tokens }))
       .sort((a, b) => b.tokens - a.tokens);
